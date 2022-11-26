@@ -570,7 +570,6 @@ namespace NetworkOnlineMonitor
             this.m_grpStatus.Controls.Add(this.m_pbLanStatus);
             this.m_grpStatus.Controls.Add(this.m_pbWanStatus);
             this.m_grpStatus.Controls.Add(this.m_lblCurrentFailDuration);
-            this.m_grpStatus.FlatStyle = System.Windows.Forms.FlatStyle.Popup;
             this.m_grpStatus.Font = new System.Drawing.Font("Tahoma", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.m_grpStatus.Location = new System.Drawing.Point(16, 33);
             this.m_grpStatus.Margin = new System.Windows.Forms.Padding(8, 1, 8, 8);

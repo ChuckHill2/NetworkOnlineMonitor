@@ -6,10 +6,8 @@ using System.Windows.Forms;
 namespace NetworkOnlineMonitor
 {
     /// <summary>
-    /// Same as GroupBox but border may be any color plus title text may
-    /// be any color or font. Ambient properties continue to be passed through
-    /// to the child controls independent of the title text properties.
-    /// Enable/Disable is properly supported for both title and border.
+    /// Same as GroupBox but border may be any color plus title text may be any color or font. 
+    /// Enable/Disable is properly supported for both title and border. This control is NOT themed.
     /// </summary>
     public class MyGroupBox : GroupBox
     {
@@ -53,6 +51,7 @@ namespace NetworkOnlineMonitor
         protected override void OnParentFontChanged(EventArgs e)
         {
             AmbientTitleFont = this.Parent?.Font ?? Control.DefaultFont;
+            AmbientTitleColor = this.Parent?.ForeColor ?? Control.DefaultForeColor;
             base.OnParentFontChanged(e);
         }
 
@@ -60,17 +59,37 @@ namespace NetworkOnlineMonitor
         [Category("Appearance"), Description("Color of the GroupBox title.")]
         public Color TitleColor
         {
-            get => __TitleColor;
+            get
+            {
+                if (__TitleColor == Color.Empty) return AmbientTitleColor;
+                return __TitleColor;
+            }
             set
             {
                 if (__TitleColor == value) return;
-                __TitleColor = value;
+                if (__TitleColor == AmbientTitleColor) __TitleColor = Color.Empty;
+                else __TitleColor = value;
                 this.Invalidate();
             }
         }
-        private Color __TitleColor = Control.DefaultForeColor;
-        private bool ShouldSerializeTitleColor() => TitleColor != Control.DefaultForeColor;
-        private void ResetTitleColor() => TitleColor = Control.DefaultForeColor;
+        private Color AmbientTitleColor = Control.DefaultForeColor;
+        private Color __TitleColor = Color.Empty;
+        private bool ShouldSerializeTitleColor() => TitleColor != AmbientTitleColor;
+        private void ResetTitleColor() => TitleColor = AmbientTitleColor;
+
+        #region Hidden/Disabled Properties
+        private const string NOTUSED = "Not used in " + nameof(MyGroupBox) + ".";
+        //! @cond DOXYGENHIDE
+        #pragma warning disable CS0067, CS0809, CS0109 //Properties and Events never used
+        [Obsolete(NOTUSED, true), Browsable(false), DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        public new FlatStyle FlatStyle { get => base.FlatStyle; set { } }
+        [Obsolete(NOTUSED, true), Browsable(false), DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        public override RightToLeft RightToLeft { get => base.RightToLeft; set { } }
+        [Obsolete(NOTUSED, true), Browsable(false), DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        public new event EventHandler RightToLeftChanged;
+        #pragma warning restore CS0067, CS0809, CS0109 //Properties and Events never used
+        //! @endcond
+        #endregion Hidden/Disabled Properties
 
         public MyGroupBox() : base() { }
 
