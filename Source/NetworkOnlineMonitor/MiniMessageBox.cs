@@ -37,8 +37,9 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
-// Depends on GDI.ExtractAssociatedIcon() and GDI.ApplyShadows() only.
-// Lifted from repos\ChuckHill2.Utilities\Source\ChuckHill2.Utilities\Tools.cs
+// ================================================================================
+// This file has NO external dependencies as such this file may be reused anywhere.
+// ================================================================================
 
 namespace ChuckHill2.Forms
 {
@@ -1003,6 +1004,10 @@ namespace ChuckHill2.Forms
         /// <summary>
         /// Graphics Utilities
         /// </summary>
+        /// <remarks>
+        /// Lifted from repos\ChuckHill2.Utilities\Source\ChuckHill2.Utilities\Tools.cs
+        /// in order to allow MiniMessageBox to be independent of any external support files.
+        /// </remarks>
         private static class GDI
         {
             [DllImport("Shell32.dll")] private static extern int SHDefExtractIconW([MarshalAs(UnmanagedType.LPWStr)] string pszIconFile, int iIndex, int uFlags, out IntPtr phiconLarge, /*out*/ IntPtr phiconSmall, int nIconSize);
@@ -1069,6 +1074,5 @@ namespace ChuckHill2.Forms
                 DwmExtendFrameIntoClientArea(form.Handle, ref margins);
             }
         }
-
     }
 }
