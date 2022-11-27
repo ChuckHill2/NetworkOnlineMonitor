@@ -319,16 +319,10 @@ namespace NetworkOnlineMonitor
                 .Where(a => Array.FindIndex(a.GetAddressBytes(), b => b != 0) >= 0)
                 .FirstOrDefault();
 
-            //This app is non-functional without internet access!
+            //This app is non-functional without internet access! We need to ping the router!
             if (gateway == null)
             {
-                //var ex = new NetworkInformationException(); //This has no support for custom messages but I like the exception type, so I hack the message into it.
-                //FieldInfo _message = typeof(Exception).GetField("_message", BindingFlags.NonPublic | BindingFlags.Instance);
-                //_message.SetValue(ex, "Wi-Fi or internet cable is disconnected. Check your settings.");
-                //throw ex;
-
                 MessageBox.Show(Application.OpenForms.Count > 0 ? Application.OpenForms[0] : null, "Your Wi-Fi or internet cable is\r\ndisconnected. Check your settings.", "Network Connection", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                //Environment.Exit(1); //This terminates with extreme prejudice. The application ends here. No cleanup.
                 Application.Exit(); //This essentially posts FormMain.Close(), so this app continues. Same as Application.OpenForms[0].Close();
                 return new LanInfo(myComputerName, myAddresses.OrderByDescending(m => m.Value).FirstOrDefault()?.Key.ToString() ?? "127.0.0.1", gateway?.ToString() ?? "127.0.0.1");
             }
