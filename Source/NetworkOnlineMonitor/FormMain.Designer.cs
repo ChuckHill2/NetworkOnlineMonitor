@@ -38,7 +38,7 @@ namespace NetworkOnlineMonitor
             this.m_MenuStrip = new System.Windows.Forms.MenuStrip();
             this.m_tsExitMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.m_tsSettingsMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.m_tsHistoryMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.m_tsEditLogMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.m_tsAboutMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.m_ToolTips = new System.Windows.Forms.ToolTip(this.components);
             this.m_lblLogging = new System.Windows.Forms.Label();
@@ -150,7 +150,7 @@ namespace NetworkOnlineMonitor
             this.m_MenuStrip.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.m_tsExitMenuItem,
             this.m_tsSettingsMenuItem,
-            this.m_tsHistoryMenuItem,
+            this.m_tsEditLogMenuItem,
             this.m_tsAboutMenuItem});
             this.m_MenuStrip.Location = new System.Drawing.Point(0, 0);
             this.m_MenuStrip.Margin = new System.Windows.Forms.Padding(0, 0, 0, 8);
@@ -179,13 +179,13 @@ namespace NetworkOnlineMonitor
             this.m_tsSettingsMenuItem.ToolTipText = "Modify the \r\napp settings.";
             this.m_tsSettingsMenuItem.Click += new System.EventHandler(this.m_tsSettingsMenuItem_Click);
             // 
-            // m_tsHistoryMenuItem
+            // m_tsEditLogMenuItem
             // 
-            this.m_tsHistoryMenuItem.Name = "m_tsHistoryMenuItem";
-            this.m_tsHistoryMenuItem.Size = new System.Drawing.Size(56, 24);
-            this.m_tsHistoryMenuItem.Text = "History";
-            this.m_tsHistoryMenuItem.ToolTipText = "Pops up the current log \r\nin the default text editor.";
-            this.m_tsHistoryMenuItem.Click += new System.EventHandler(this.m_tsHistoryMenuItem_Click);
+            this.m_tsEditLogMenuItem.Name = "m_tsEditLogMenuItem";
+            this.m_tsEditLogMenuItem.Size = new System.Drawing.Size(39, 24);
+            this.m_tsEditLogMenuItem.Text = "Log";
+            this.m_tsEditLogMenuItem.ToolTipText = "Opens the current log for viewing and editing.";
+            this.m_tsEditLogMenuItem.Click += new System.EventHandler(this.m_tsEditLogMenuItem_Click);
             // 
             // m_tsAboutMenuItem
             // 
@@ -393,7 +393,7 @@ namespace NetworkOnlineMonitor
             // 
             this.m_txtMonitorStarted.AutoSize = true;
             this.m_txtMonitorStarted.Font = new System.Drawing.Font("Calibri", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.m_txtMonitorStarted.Location = new System.Drawing.Point(115, 24);
+            this.m_txtMonitorStarted.Location = new System.Drawing.Point(115, 25);
             this.m_txtMonitorStarted.Name = "m_txtMonitorStarted";
             this.m_txtMonitorStarted.Size = new System.Drawing.Size(129, 14);
             this.m_txtMonitorStarted.TabIndex = 12;
@@ -421,7 +421,7 @@ namespace NetworkOnlineMonitor
             // 
             this.m_txtLastFailureStart.AutoSize = true;
             this.m_txtLastFailureStart.Font = new System.Drawing.Font("Calibri", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.m_txtLastFailureStart.Location = new System.Drawing.Point(115, 82);
+            this.m_txtLastFailureStart.Location = new System.Drawing.Point(115, 83);
             this.m_txtLastFailureStart.Name = "m_txtLastFailureStart";
             this.m_txtLastFailureStart.Size = new System.Drawing.Size(19, 14);
             this.m_txtLastFailureStart.TabIndex = 7;
@@ -691,7 +691,7 @@ namespace NetworkOnlineMonitor
         private System.Windows.Forms.ToolStripMenuItem m_tsExitMenuItem;
         private System.Windows.Forms.ToolStripMenuItem m_tsSettingsMenuItem;
         private System.Windows.Forms.ToolStripMenuItem m_tsAboutMenuItem;
-        private System.Windows.Forms.ToolStripMenuItem m_tsHistoryMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem m_tsEditLogMenuItem;
         private MyGroupBox m_grpStatus;
         private MyGroupBox m_grpPingTests;
         private MyGroupBox m_grpResults;

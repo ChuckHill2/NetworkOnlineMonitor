@@ -201,7 +201,7 @@ namespace NetworkOnlineMonitor
         /// </summary>
         /// <param name="Log">Optional log to write any deserialization errors to.</param>
         /// <returns>Deserialized settings object</returns>
-        public static Settings Deserialize(XFileLogging Log=null)
+        public static Settings Deserialize(FileLogging Log=null)
         {
             if (!File.Exists(XmlPath)) return new Settings();
             var xs = new XmlSerializer(typeof(Settings));

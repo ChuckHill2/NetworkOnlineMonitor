@@ -198,7 +198,7 @@ namespace NetworkOnlineMonitor
         [DllImport("Kernel32.dll")]
         private static extern void GetSystemTimeAsFileTime(out long SystemTimeAsFileTime);
         /// <summary>
-        /// UTC time in ticks 
+        /// UTC time in ticks. Lowest overhead. Great for determining duration.
         /// </summary>
         public static long UtcTimerTicks
         {

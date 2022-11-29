@@ -1,10 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Data;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
-using System.Media;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Reflection;
@@ -12,9 +12,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using ChuckHill2;
 using ChuckHill2.Forms;
-using Microsoft.Win32;
 using NetworkOnlineMonitor.Properties;
 
 // Note: Identifiers for all controls on all forms consist of m_[2-3 letter control type][camel-case field name] 
@@ -28,12 +26,15 @@ namespace NetworkOnlineMonitor
         private CaptionBarCloseButton CloseButtonHandler; //Reassign the close button to minimize app to the system tray.
         private Task MonitorTask;         //Handle to wait for task exit
         private Target[] Targets;         //List of ping targets where index 0 is the LAN gateway address.
-        private XFileLogging Log;         //Log the monitored events.
+        private FileLogging Log;         //Log the monitored events.
         private bool CancelWork = false;  //We use 2 forms of cancellation: a bool flag and cancel token, maybe overkill?
         private CancellationTokenSource CancelTokenSource;
         private CancellationToken CancelToken;
         private Thread MonitorThread;     //Keep thread for MonitorStop() just in case Monitor() refuses to stop. Monitor() set's this.
         private long LogFaultStart = 0;   //needs to be global to support tray tooltip. Set and used in Monitor() and used in m_TrayIcon.MouseMove.
+        private const string SoftLogDivider = "---------------------------------------";
+
+        private readonly List<long> DownTimeList = new List<long>();
 
         public FormMain()
         {
@@ -43,7 +44,7 @@ namespace NetworkOnlineMonitor
             // private WindowsFormsSynchronizationContext Context = new WindowsFormsSynchronizationContext();
             // Context.Send((f) => this.Text = "HelloWorld", null);
 
-            settings = Settings.Deserialize(Log);
+            settings = Settings.Deserialize();
 
             if (settings.MainFormLocation == Point.Empty) this.StartPosition = FormStartPosition.CenterScreen;
             else
@@ -65,7 +66,11 @@ namespace NetworkOnlineMonitor
             }, "Minimize to\nSystem Tray.");
             CloseButtonHandler.UpdateSysMenuCloseToMinimize();
 
-            this.FormClosing += (s, e) => StopMonitor();
+            this.FormClosing += (s, e) =>
+            {
+                LogWriteFailureSummary();
+                StopMonitor();
+            };
             this.FormClosed += (s, e) => 
             { 
                 m_ctxTray.Visible = false;
@@ -75,8 +80,8 @@ namespace NetworkOnlineMonitor
             m_TrayIcon.MouseMove += (s, e) =>
             {
                 if (!m_grpPingTests.Enabled) m_TrayIcon.Text = "Network Monitoring\r\nStopped";
-                else if (LogFaultStart == 0) m_TrayIcon.Text = "Network Monitor\r\nDuration " + TimeSpanFormat(DateTime.Now - ((DateTime)m_txtMonitorDuration.Tag));
-                else m_TrayIcon.Text = "Network Down\r\nDuration " + TimeSpanFormat(DateTime.Now.Ticks - LogFaultStart);
+                else if (LogFaultStart == 0) m_TrayIcon.Text = "Network Monitor\r\nDuration " + TimeSpanFormat(StaticTools.UtcTimerTicks - MonitorDurationStartTicks);
+                else m_TrayIcon.Text = "Network Down\r\nDuration " + TimeSpanFormat(StaticTools.UtcTimerTicks - LogFaultStart);
             };
         }
 
@@ -89,12 +94,13 @@ namespace NetworkOnlineMonitor
             }
             base.OnShown(e);
 
-            if (settings.LogFileOption == LogFileOption.None) Log = new XFileLogging(); //empty logger / no-op
-            else if (settings.LogFileOption == LogFileOption.CreateNew) Log = new XFileLogging(settings.LogFilePath);
-            else if (settings.LogFileOption == LogFileOption.Append) Log = new XFileLogging(settings.LogFilePath, true);
+            if (settings.LogFileOption == LogFileOption.None) Log = new FileLogging(); //empty logger / no-op
+            else if (settings.LogFileOption == LogFileOption.CreateNew) Log = new FileLogging(settings.LogFilePath);
+            else if (settings.LogFileOption == LogFileOption.Append) Log = new FileLogging(settings.LogFilePath, true);
+            LogWriteSettingsInfo();
 
             StartMonitor();
-            m_txtMonitorStarted.Text = DateTime.Now.ToString("g");
+            m_txtMonitorStarted.Text = DateTime.Now.ToString("G");
         }
 
         private void m_tsExitMenuItem_Click(object sender, EventArgs e) => this.Close();
@@ -104,21 +110,44 @@ namespace NetworkOnlineMonitor
             var newSettings = FormSettings.Show(this, settings);
             if (newSettings != null)
             {
-                StopMonitor();
-                if (settings.LogFileOption != newSettings.LogFileOption || !settings.LogFileFolder.Equals(newSettings.LogFileFolder, StringComparison.CurrentCultureIgnoreCase))
-                {
-                    Log.Dispose();
-                    if (settings.LogFileOption == LogFileOption.None) Log = new XFileLogging();
-                    else if (settings.LogFileOption == LogFileOption.CreateNew) Log = new XFileLogging(settings.LogFilePath);
-                    else if (settings.LogFileOption == LogFileOption.Append) Log = new XFileLogging(settings.LogFilePath, true);
-                }
-                settings = newSettings;
+                bool doLogWriteNewSettings = !settings.Targets.SequenceEqual(newSettings.Targets)
+                    || settings.TestInterval != newSettings.TestInterval
+                    || settings.OfflineTrigger != newSettings.OfflineTrigger
+                    || settings.PingTimeout != newSettings.PingTimeout;
+
+                bool doRestartLog = settings.LogFileOption != newSettings.LogFileOption
+                    || !settings.LogFileFolder.Equals(newSettings.LogFileFolder, StringComparison.CurrentCultureIgnoreCase);
+
+                bool doRestartMonitor = doLogWriteNewSettings || doRestartLog
+                    || settings.PopUpOnFailure != newSettings.PopUpOnFailure; //because we need to update this on the "Settings" groupbox.
+
+                settings = newSettings; //monitor uses these settings, so set before starting monitor.
                 settings.Serialize();
-                StartMonitor();
+
+                if (doRestartMonitor)
+                {
+                    StopMonitor();
+                    if (doRestartLog)
+                    {
+                        //changing logging.
+                        LogWriteFailureSummary();
+                        Log.Dispose();
+                        if (settings.LogFileOption == LogFileOption.None) Log = new FileLogging();
+                        else if (settings.LogFileOption == LogFileOption.CreateNew) Log = new FileLogging(settings.LogFilePath);
+                        else if (settings.LogFileOption == LogFileOption.Append) Log = new FileLogging(settings.LogFilePath, true);
+                        doLogWriteNewSettings = true;
+                    }
+                    else
+                        Log.WriteLine(SoftLogDivider); //write a leading delimiter for LogWriteSettingsInfo() if we don't restart the log.
+
+                    StartMonitor();
+                }
+
+                if (doLogWriteNewSettings) LogWriteSettingsInfo();
             }
         }
 
-        private void m_tsHistoryMenuItem_Click(object sender, EventArgs e)
+        private void m_tsEditLogMenuItem_Click(object sender, EventArgs e)
         {
             if (settings.LogFileOption==LogFileOption.None)
             {
@@ -129,17 +158,19 @@ namespace NetworkOnlineMonitor
             var logFile = Log?.OutputFile;
             if (string.IsNullOrEmpty(logFile))  //This should never happen!
             {
-                Debug.WriteLine($"ERROR: m_tsHistoryMenuItem_Click: {nameof(XFileLogging)}.{nameof(XFileLogging.OutputFile)} is NULL! This should never happen!");
+                Debug.WriteLine($"ERROR: m_tsHistoryMenuItem_Click: {nameof(FileLogging)}.{nameof(FileLogging.OutputFile)} is NULL! This should never happen!");
                 return;
             }
 
-            // Hack to use my favorite editor instead of ugly windows notepad.exe
-            var viewer = @"C:\Program Files\Notepad++\notepad++.exe";
-            if (!File.Exists(viewer)) viewer = @"C:\Program Files (x86)\Notepad++\notepad++.exe";
-            if (!File.Exists(viewer)) viewer = null; //use the users default text editor.
+            Log.LogEdit();
 
-            if (viewer == null) Process.Start(logFile);
-            else Process.Start(new ProcessStartInfo(viewer, $" -nosession -n2147483647 \"{logFile}\""));
+            //// Hack to use my favorite editor instead of ugly windows notepad.exe
+            //var viewer = @"C:\Program Files\Notepad++\notepad++.exe";
+            //if (!File.Exists(viewer)) viewer = @"C:\Program Files (x86)\Notepad++\notepad++.exe";
+            //if (!File.Exists(viewer)) viewer = null; //use the users default text editor.
+
+            //if (viewer == null) Process.Start(logFile);
+            //else Process.Start(new ProcessStartInfo(viewer, $" -nosession -n2147483647 \"{logFile}\""));
         }
 
         private void m_tsAboutMenuItem_Click(object sender, EventArgs e) => FormAbout.Show(this);
@@ -205,7 +236,6 @@ namespace NetworkOnlineMonitor
             CancelToken = CancelTokenSource.Token;
             Targets = BuildTargets();
 
-            LogWriteSettingsInfo();
             UpdateUI(UIState.Start);
 
             Task.Run(() => MonitorDuration(), CancelToken);
@@ -221,7 +251,7 @@ namespace NetworkOnlineMonitor
             long loopStart = 0;
             Target[] wanTargets = Targets.Skip(1).ToArray(); //skip the Lan target. All following targets are the WAN.
             int testInterval = settings.TestInterval * 1000; //pre-convert to ms
-            int offlineTrigger = settings.OfflineTrigger * 1000; //compute to ms
+            long offlineTrigger = settings.OfflineTrigger * TimeSpan.TicksPerSecond; //compute to ticks
 
             var ping = new PingTest(settings.PingTimeout);
             int targetIndex = 0;
@@ -229,7 +259,7 @@ namespace NetworkOnlineMonitor
             {
                 if (loopStart != 0)
                 {
-                    var pingDuration = (int)((DateTime.Now.Ticks - loopStart) / TimeSpan.TicksPerMillisecond); //this works because our Ping is synchronous.
+                    var pingDuration = (int)((StaticTools.UtcTimerTicks - loopStart) / TimeSpan.TicksPerMillisecond); //this works because our Ping is synchronous.
                     var timeout = !faulted ? testInterval - pingDuration : 500+settings.PingTimeout - pingDuration; //test more quickly if ping failed.
                     if (timeout < 0) timeout = 0;
                     if (timeout > testInterval) timeout = testInterval;
@@ -239,7 +269,7 @@ namespace NetworkOnlineMonitor
                 }
                 else Debug.WriteLine($"Monitor Pinging {wanTargets[targetIndex]}: Starting ping immediately");
 
-                loopStart = DateTime.Now.Ticks;
+                loopStart = StaticTools.UtcTimerTicks;
 
                 var t = wanTargets[targetIndex++ % wanTargets.Length];
                 if (targetIndex == wanTargets.Length) targetIndex = 0;
@@ -249,18 +279,18 @@ namespace NetworkOnlineMonitor
 
                 if (ping.Send(t.Address))
                 {
-                    if (faulted)
+                    if (faulted) //We recovered from offline condition 
                     {
-                        LogNetworkDown(LogFaultStart, Targets[0].Response);
-                        UpdateUI(UIState.Online, ping);
+                        LogNetworkDown(LogFaultStart, Targets[0].Response); //Now that we know how long the network was down, we write out outstanding network down message.
+                        UpdateUI(UIState.Online);
                         faulted = false;
                     }
-                    LogFaultStart = 0;
+                    LogFaultStart = 0;  //ping successful. stop the fault countdown.
                     CallForm(() => //set success green ball after yellow
                     {
                         t.Icon = Resources.SphereGreen24;
                         t.Response = ping.ResponseTime;
-                    });
+                    },true);
                 }
                 else
                 {
@@ -268,23 +298,23 @@ namespace NetworkOnlineMonitor
                     {
                         t.Icon = Resources.SphereRed24;
                         t.Response = ping.ResponseTime;
-                    });
-                    if (LogFaultStart == 0)
+                    },true);
+                    if (LogFaultStart == 0) //ping failed, start counting.
                     {
-                        LogFaultStart = DateTime.Now.Ticks;
+                        LogFaultStart = StaticTools.UtcTimerTicks;
                     }
 
-                    int faultDuration = (int)((DateTime.Now.Ticks - LogFaultStart) / TimeSpan.TicksPerMillisecond);
-                    if (faultDuration < offlineTrigger) continue;
-                    if (!faulted)
+                    long faultDuration = StaticTools.UtcTimerTicks - LogFaultStart;
+                    if (faultDuration < offlineTrigger) continue; //we wait until we *really* want to notify the user that we are down. Want to ignore downtime transients.
+                    if (!faulted) 
                     {
                         faulted = true;
-                        UpdateUI(UIState.Offline, ping);
+                        UpdateUI(UIState.Offline, ping); //need to ping LAN to verify if it is also down and adjust the LAN icons accordingly,
                     }
                 }
             }
 
-            if (LogFaultStart!=0) LogNetworkDown(LogFaultStart, Targets[0].Response);
+            if (LogFaultStart!=0) LogNetworkDown(LogFaultStart, Targets[0].Response); //flush any outstanding network down messages.
             LogFaultStart = 0;
             ping.Dispose();
             Debug.WriteLine($"Monitor Stopped");
@@ -385,22 +415,24 @@ namespace NetworkOnlineMonitor
                     m_TrayIcon.Icon = global::NetworkOnlineMonitor.Properties.Resources.favicon;
                     //this.Icon = global::NetworkOnlineMonitor.Properties.Resources.favicon;
 
-                    m_txtLastFailureStart.Text = new DateTime(LogFaultStart).ToString("G");
-                    m_txtLastFailDuration.Text = TimeSpanFormat(DateTime.Now.Ticks - LogFaultStart);
-                    m_txtFailureCount.Text = int.TryParse(m_txtFailureCount.Text, out int i) ? (i + 1).ToString() : m_txtFailureCount.Text;
+                    m_txtLastFailureStart.Text = new DateTime(LogFaultStart, DateTimeKind.Utc).ToLocalTime().ToString("G");
+                    long tickduration = StaticTools.UtcTimerTicks - LogFaultStart;
+                    DownTimeList.Add(tickduration); //Add to tick downtime duration array
+                    m_txtLastFailDuration.Text = TimeSpanFormat(tickduration);
+                    m_txtFailureCount.Text = DownTimeList.Count.ToString();
                 }, true);
                 return;
             }
 
             if (uiState == UIState.Offline)
             {
-                if (settings.PopUpOnFailure)
-                {
-                    Show();
-                    this.WindowState = FormWindowState.Normal;
-                }
                 CallForm(() =>
                 {
+                    if (settings.PopUpOnFailure)
+                    {
+                        Show();
+                        this.WindowState = FormWindowState.Normal;
+                    }
                     m_grpPingTests.Enabled = true;
                     m_grpResults.Enabled = true;
                     m_grpSettings.Enabled = true;
@@ -476,7 +508,7 @@ namespace NetworkOnlineMonitor
         {
             Debug.WriteLine("CurrentFailDuration Started");
 
-            var started = DateTime.Now;
+            var started = StaticTools.UtcTimerTicks;
             if (!CancelWork && !stop)
             {
                 CallForm(() =>
@@ -499,58 +531,93 @@ namespace NetworkOnlineMonitor
                     Debug.WriteLine("CurrentFailDuration Ended");
                     return;
                 }
-                CallForm(() => m_txtCurrentFailDuration.Text = TimeSpanFormat(DateTime.Now - started));
+                CallForm(() => m_txtCurrentFailDuration.Text = TimeSpanFormat(StaticTools.UtcTimerTicks - started));
                 SpinWait.SpinUntil(() => CancelWork, 1000);
             }
         }
 
+        private long MonitorDurationStartTicks = -1;
         private void MonitorDuration()
         {
             Debug.WriteLine("MonitorDuration Started");
-            DateTime started;
+
+            long started;
 
             //Exclude time when monitoring was stopped.
-            if (m_txtMonitorDuration.Tag == null)
+            if (MonitorDurationStartTicks == -1)
             {
-                started = DateTime.Now;
-                m_txtMonitorDuration.Tag = started;
+                started = StaticTools.UtcTimerTicks;
+                MonitorDurationStartTicks = started;
             }
             else
             {
-                started = DateTime.Now.AddTicks(((DateTime)m_txtMonitorDuration.Tag).Ticks-DateTime.Now.Ticks);
-                m_txtMonitorDuration.Tag = started;
+                started = StaticTools.UtcTimerTicks - MonitorDurationStartTicks;
+                MonitorDurationStartTicks = started;
             }
 
             while (!CancelWork)
             {
-                CallForm(() => m_txtMonitorDuration.Text = TimeSpanFormat(DateTime.Now - started));
+                CallForm(() => m_txtMonitorDuration.Text = TimeSpanFormat(StaticTools.UtcTimerTicks - started));
                 SpinWait.SpinUntil(() => CancelWork, 1000);
             }
             Debug.WriteLine("MonitorDuration Ended");
         }
 
+        //This is written at the beginning of the log and every time one of these Settings properties has changed.
         private void LogWriteSettingsInfo()
         {
             int i = 0;
             var sb = new StringBuilder();
-            sb.AppendLine("---------------------------------------");
             Array.ForEach(settings.Targets, t => sb.AppendLine($"Ping Target {++i}: {t.AddressStr} - {t.Name}"));
             sb.Append("Wait for Ping (milliseconds): "); sb.AppendLine(settings.PingTimeout.ToString());
             sb.Append("Test Interval (seconds): "); sb.AppendLine(settings.TestInterval.ToString());
             sb.Append("Log Failure Longer Than (seconds): "); sb.AppendLine(settings.OfflineTrigger.ToString());
-            sb.Append("---------------------------------------");
+            sb.Append(SoftLogDivider);
             Log.WriteLine(sb.ToString());
         }
 
+        //This is written when the network is back up after a failure.
         private void LogNetworkDown(long faultStartTimeTicks, int lanResponseTimeMs)
         {
-            string duration = TimeSpanFormat(TimeSpan.FromTicks(DateTime.Now.Ticks - faultStartTimeTicks));
-            DateTime startDate = new DateTime(faultStartTimeTicks);
+            string duration = TimeSpanFormat(TimeSpan.FromTicks(StaticTools.UtcTimerTicks - faultStartTimeTicks));
+            DateTime startDate = new DateTime(faultStartTimeTicks,DateTimeKind.Utc).ToLocalTime();
 
             if (lanResponseTimeMs != PingTest.ResponseTimeout)
                 Log.WriteLine($"WAN Failed - {startDate:G}, Duration={duration}, LAN responded in {lanResponseTimeMs} ms");
             else
                 Log.WriteLine($"LAN Failed - {startDate:G}, Duration={duration}");
+        }
+
+        //This is the last item in the Log before it is closed.
+        private void LogWriteFailureSummary()
+        {
+            DateTime now = DateTime.Now;
+            var szMonitoredDuration = m_txtMonitorDuration.Text;
+            TimeSpan monitoredDuration = TimeSpanParse(szMonitoredDuration);
+            var sb = new StringBuilder();
+
+            sb.AppendLine(SoftLogDivider);
+            sb.AppendLine($"Log End {now:G}");
+            sb.AppendLine($"Monitor Duration {szMonitoredDuration}");
+
+            if (DownTimeList.Count > 0)
+            {
+                var downtimeList = DownTimeList.OrderBy(m=>m).ToList();
+
+                sb.AppendLine($"Failure Summary:");
+                sb.AppendLine($"  Count          {downtimeList.Count}");
+                sb.AppendLine($"  Total Downtime {TimeSpanFormat(downtimeList.Sum())}");
+                sb.AppendLine($"  % Downtime     {(downtimeList.Sum() / (double)monitoredDuration.Ticks).ToString("0.00%")}");
+                sb.AppendLine($"  Minimum Length {TimeSpanFormat(downtimeList.Min())}");
+                sb.AppendLine($"  Maximum Length {TimeSpanFormat(downtimeList.Max())}");
+                sb.AppendLine($"  Average Length {TimeSpanFormat((long)downtimeList.Average())}");
+                var median = downtimeList.Count % 2 == 0 ? (downtimeList[downtimeList.Count / 2] + downtimeList[downtimeList.Count / 2 - 1]) / 2 : downtimeList[downtimeList.Count / 2];
+                sb.Append($"  Median Length  {TimeSpanFormat(median)}");
+            }
+            else
+                sb.Append($"(No Failures)");
+
+            Log.WriteLine(sb.ToString());
         }
 
         private static string TimeSpanFormat(TimeSpan tsp) => $"{(int)tsp.TotalHours:#0}:{tsp.Minutes:00}:{tsp.Seconds:00}";
@@ -659,7 +726,7 @@ namespace NetworkOnlineMonitor
             public readonly int Timeout;
             /// <summary>The last IP address pinged.</summary>
             public IPAddress Address;
-            /// <summary>The last response time or int.MaxValue upon error.</summary>
+            /// <summary>The last response time or 'ResponseTimeout' upon error.</summary>
             public int ResponseTime;
             /// <summary>The last response status.</summary>
             public bool Success;
@@ -695,12 +762,7 @@ namespace NetworkOnlineMonitor
                     Address = addr;
                     PingReply pingReply = Pinger.Send(addr, timeout, PingBuf, pingOptions);
                     Success = pingReply.Status == IPStatus.Success;
-                    ResponseTime = checked((int)pingReply.RoundtripTime);
-                    if (Success && ResponseTime > timeout)
-                    {
-                        Success = false;
-                        ResponseTime = PingTest.ResponseTimeout;
-                    }
+                    ResponseTime = Success ? checked((int)pingReply.RoundtripTime) : PingTest.ResponseTimeout;
                 }
                 catch (Exception ex)
                 {
