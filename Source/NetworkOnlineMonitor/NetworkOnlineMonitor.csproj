@@ -60,6 +60,12 @@
     <Compile Include="ColorTrackbar.cs">
       <SubType>Component</SubType>
     </Compile>
+    <Compile Include="FormLogEditor.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="FormLogEditor.Designer.cs">
+      <DependentUpon>FormLogEditor.cs</DependentUpon>
+    </Compile>
     <Compile Include="MyGroupBox.cs">
       <SubType>Component</SubType>
     </Compile>
@@ -72,9 +78,6 @@
       <DependentUpon>SoundClipCtrl.cs</DependentUpon>
     </Compile>
     <Compile Include="StaticTools.cs" />
-    <Compile Include="Divider.cs">
-      <SubType>Component</SubType>
-    </Compile>
     <Compile Include="FileLogging.cs" />
     <Compile Include="FolderSelectDialog.cs" />
     <Compile Include="FormAbout.cs">
@@ -123,6 +126,9 @@
     </Compile>
     <EmbeddedResource Include="FormAbout.resx">
       <DependentUpon>FormAbout.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="FormLogEditor.resx">
+      <DependentUpon>FormLogEditor.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="FormMain.resx">
       <DependentUpon>FormMain.cs</DependentUpon>
