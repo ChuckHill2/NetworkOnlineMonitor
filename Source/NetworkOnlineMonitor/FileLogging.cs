@@ -1,35 +1,8 @@
-//--------------------------------------------------------------------------
-// <summary>
-//   
-// </summary>
-// <copyright file="XFileLogging.cs" company="Chuck Hill">
-// Copyright (c) 2020 Chuck Hill.
-//
-// This library is free software; you can redistribute it and/or
-// modify it under the terms of the GNU Lesser General Public License
-// as published by the Free Software Foundation; either version 2.1
-// of the License, or (at your option) any later version.
-//
-// This library is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU Lesser General Public License for more details.
-//
-// The GNU Lesser General Public License can be viewed at
-// http://www.opensource.org/licenses/lgpl-license.php. If
-// you unfamiliar with this license or have questions about
-// it, here is an http://www.gnu.org/licenses/gpl-faq.html.
-//
-// All code and executables are provided "as is" with no warranty
-// either express or implied. The author accepts no liability for
-// any damage or loss of business that this product may cause.
-// </copyright>
-// <repository>https://github.com/ChuckHill2/ChuckHill2.Utilities</repository>
-// <author>Chuck Hill</author>
-//--------------------------------------------------------------------------
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Windows.Forms;
+using ChuckHill2.Forms;
 
 namespace NetworkOnlineMonitor
 {
@@ -40,14 +13,15 @@ namespace NetworkOnlineMonitor
     /// This class has been named XFileLogging because the name 'FileLogging' is all too common!!
     /// </remarks>
     [Serializable]
-    public class XFileLogging: MarshalByRefObject, IDisposable
+    public class FileLogging: MarshalByRefObject, IDisposable
     {
         private StreamWriter stream;
         public readonly string OutputFile;
         public readonly bool Append;
         private int HeaderLength;
+        private FormLogEditor EditDialog = null;
 
-        public XFileLogging(string outputFile=null, bool append=false)
+        public FileLogging(string outputFile=null, bool append=false)
         {
             OutputFile = outputFile;
             Append = append;
@@ -71,7 +45,7 @@ namespace NetworkOnlineMonitor
             //LeaveOpen==false, We want StreamWriter to close our base stream as well.
             stream = new StreamWriter(fs, System.Text.Encoding.UTF8, 1024, false);
 
-            var msg = $"==== {Path.GetFileNameWithoutExtension(StaticTools.ExecutableName)} Log {DateTime.Now.ToString("g")} ====";
+            var msg = $"{(fs.Length == 0 ? string.Empty : Environment.NewLine)}==== {Path.GetFileNameWithoutExtension(StaticTools.ExecutableName)} Log {DateTime.Now.ToString("g")} ====";
             HeaderLength = msg.Length;
             stream.WriteLine(msg);
             stream.Flush();
@@ -93,6 +67,8 @@ namespace NetworkOnlineMonitor
             if (stream == null) return;
             lock (stream)
             {
+                EditDialog?.Close();
+                EditDialog = null;
                 var msg = "==== End of Log ";
                 msg = msg + new string('=', HeaderLength - msg.Length);
                 stream.WriteLine(msg);
@@ -120,11 +96,29 @@ namespace NetworkOnlineMonitor
             lock (stream)
             {
                 if (stream == null) return;
+                if (EditDialog != null && !EditDialog.IsDisposed) EditDialog.AppendLine(msg);
+                stream.BaseStream.Seek(0, SeekOrigin.End); //Incase someone edited the file, externally (not FormLogEditor).
                 stream.WriteLine(msg);
                 //Always flush to disk so external editing is always current.
                 stream.Flush();
                 stream.BaseStream.FlushAsync();
             }
+        }
+
+        public void LogEdit()
+        {
+            if (EditDialog != null && !EditDialog.IsDisposed)
+            {
+                //MiniMessageBox.ShowDialog(EditDialog.Owner, "Log Editor is already open.", "Log Edit", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+                EditDialog.Focus();
+                return;
+            }
+
+            //Show editor dialog as modalless (i.e. returns immediately) and owned by the form that called this method (e.g. FormMain)
+            //It is closed by the editor dialog close button (e.g. the user) or automatically when the log file is closed.
+
+            EditDialog = new FormLogEditor(OutputFile);
+            EditDialog.Show(Application.OpenForms[Application.OpenForms.Count - 1]);
         }
    }
 }
