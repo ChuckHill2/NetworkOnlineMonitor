@@ -260,7 +260,7 @@ namespace NetworkOnlineMonitor
                 if (loopStart != 0)
                 {
                     var pingDuration = (int)((StaticTools.UtcTimerTicks - loopStart) / TimeSpan.TicksPerMillisecond); //this works because our Ping is synchronous.
-                    var timeout = !faulted ? testInterval - pingDuration : 500+settings.PingTimeout - pingDuration; //test more quickly if ping failed.
+                    var timeout = ping.Success ? testInterval - pingDuration : 500+settings.PingTimeout - pingDuration; //test more quickly if ping failed.
                     if (timeout < 0) timeout = 0;
                     if (timeout > testInterval) timeout = testInterval;
                     Debug.WriteLine($"Monitor Pinging {wanTargets[targetIndex]} after {timeout}ms: Previous Duration={pingDuration}ms, TestInterval={testInterval}ms");
@@ -443,12 +443,13 @@ namespace NetworkOnlineMonitor
                     m_pbWanStatus.Image = Resources.WanDown64;
                     m_txtWanStatus.Text = Resources.WanDownText;
 
-                    this.BackColor = Color.Pink;
-                    this.m_grpPingTests.BorderColor = Color.PaleVioletRed;
-                    this.m_grpResults.BorderColor = Color.PaleVioletRed;
-                    this.m_grpSettings.BorderColor = Color.PaleVioletRed;
-                    this.m_grpStatus.BorderColor = Color.PaleVioletRed;
-                    this.m_MenuStrip.BackColor = Color.FromArgb(255, 231, 162, 174);
+                    this.BackColor = Color.MistyRose;
+                    var highlight = Color.LightPink;
+                    this.m_grpPingTests.BorderColor = highlight;
+                    this.m_grpResults.BorderColor = highlight;
+                    this.m_grpSettings.BorderColor = highlight;
+                    this.m_grpStatus.BorderColor = highlight;
+                    this.m_MenuStrip.BackColor = Color.FromArgb(255, 255, 209, 204);
 
                     m_TrayIcon.Icon = global::NetworkOnlineMonitor.Properties.Resources.favicon_Red;
                     //this.Icon = global::NetworkOnlineMonitor.Properties.Resources.favicon_Red;
@@ -484,7 +485,7 @@ namespace NetworkOnlineMonitor
             {
                 if (this.InvokeRequired)
                 {
-                    this.Invoke(command);
+                    try { this.Invoke(command); } catch { }  //Hide ThreadAbortException
                 }
                 else
                 {
