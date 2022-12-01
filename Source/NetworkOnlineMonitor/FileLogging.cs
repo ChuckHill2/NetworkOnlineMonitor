@@ -15,6 +15,7 @@ namespace NetworkOnlineMonitor
     [Serializable]
     public class FileLogging: MarshalByRefObject, IDisposable
     {
+        private bool WroteSoftDivider = true; //flag to disallow multiple SoftDividers to be written consecutively.
         private StreamWriter stream;
         public readonly string OutputFile;
         public readonly bool Append;
@@ -45,19 +46,26 @@ namespace NetworkOnlineMonitor
             //LeaveOpen==false, We want StreamWriter to close our base stream as well.
             stream = new StreamWriter(fs, System.Text.Encoding.UTF8, 1024, false);
 
-            var msg = $"{(fs.Length == 0 ? string.Empty : Environment.NewLine)}==== {Path.GetFileNameWithoutExtension(StaticTools.ExecutableName)} Log {DateTime.Now.ToString("g")} ====";
+            //Write the starting hard divider
+            var msg = $"= {Path.GetFileNameWithoutExtension(StaticTools.ExecutableName)} Log {DateTime.Now.ToString("g")} =";
+            int pad = 78 - msg.Length;
+            if (pad < 0) pad = 0;
+            int leftpad = pad / 2;
+            int rightpad = leftpad + (pad % 2);
+            msg = new string('=', leftpad) + msg + new string('=', rightpad);
             HeaderLength = msg.Length;
+            if (fs.Length > 0) msg = Environment.NewLine + msg;
             stream.WriteLine(msg);
             stream.Flush();
             stream.BaseStream.FlushAsync();
 
             //Handle if something bad happens.
-            AppDomain.CurrentDomain.DomainUnload += CurrentDomain_DomainUnload;
-            AppDomain.CurrentDomain.ProcessExit += CurrentDomain_DomainUnload;
-            AppDomain.CurrentDomain.UnhandledException += CurrentDomain_DomainUnload;
+            AppDomain.CurrentDomain.DomainUnload += CurrentDomain_DisposeLog;
+            AppDomain.CurrentDomain.ProcessExit += CurrentDomain_DisposeLog;
+            AppDomain.CurrentDomain.UnhandledException += CurrentDomain_DisposeLog;
         }
 
-        private void CurrentDomain_DomainUnload(object sender, EventArgs e) => Dispose();
+        private void CurrentDomain_DisposeLog(object sender, EventArgs e) => Dispose();
 
         /// <summary>
         /// Flush and close the log file. If not used, it will be safely closed upon exit.
@@ -67,14 +75,19 @@ namespace NetworkOnlineMonitor
             if (stream == null) return;
             lock (stream)
             {
+                //Remove disposing events
+                AppDomain.CurrentDomain.DomainUnload -= CurrentDomain_DisposeLog;
+                AppDomain.CurrentDomain.ProcessExit -= CurrentDomain_DisposeLog;
+                AppDomain.CurrentDomain.UnhandledException -= CurrentDomain_DisposeLog;
+
+                //Close the log editor if it is open
                 EditDialog?.Close();
                 EditDialog = null;
+
+                //Write the ending hard divider and close the log.
                 var msg = "==== End of Log ";
                 msg = msg + new string('=', HeaderLength - msg.Length);
                 stream.WriteLine(msg);
-                AppDomain.CurrentDomain.DomainUnload -= CurrentDomain_DomainUnload;
-                AppDomain.CurrentDomain.ProcessExit -= CurrentDomain_DomainUnload;
-                AppDomain.CurrentDomain.UnhandledException -= CurrentDomain_DomainUnload;
                 stream.Close();
             }
             stream = null;
@@ -84,6 +97,16 @@ namespace NetworkOnlineMonitor
         /// Determine if this instance has already been disposed.
         /// </summary>
         public bool IsDisposed => stream == null;
+
+        /// <summary>
+        /// Write a standardized soft divider line while disallowing multiple divider lines to be written consecutively.
+        /// </summary>
+        public void WriteSoftDivider()
+        {
+            if (WroteSoftDivider) return;
+            WriteLine(@"---------------------------------------");
+            WroteSoftDivider = true;
+        }
 
         /// <summary>
         /// Write a message to the log file.
@@ -96,6 +119,7 @@ namespace NetworkOnlineMonitor
             lock (stream)
             {
                 if (stream == null) return;
+                WroteSoftDivider = false;
                 if (EditDialog != null && !EditDialog.IsDisposed) EditDialog.AppendLine(msg);
                 stream.BaseStream.Seek(0, SeekOrigin.End); //Incase someone edited the file, externally (not FormLogEditor).
                 stream.WriteLine(msg);

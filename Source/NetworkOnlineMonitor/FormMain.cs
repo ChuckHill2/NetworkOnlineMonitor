@@ -32,7 +32,6 @@ namespace NetworkOnlineMonitor
         private CancellationToken CancelToken;
         private Thread MonitorThread;     //Keep thread for MonitorStop() just in case Monitor() refuses to stop. Monitor() set's this.
         private long LogFaultStart = 0;   //needs to be global to support tray tooltip. Set and used in Monitor() and used in m_TrayIcon.MouseMove.
-        private const string SoftLogDivider = "---------------------------------------";
 
         private readonly List<long> DownTimeList = new List<long>();
 
@@ -137,8 +136,6 @@ namespace NetworkOnlineMonitor
                         else if (settings.LogFileOption == LogFileOption.Append) Log = new FileLogging(settings.LogFilePath, true);
                         doLogWriteNewSettings = true;
                     }
-                    else
-                        Log.WriteLine(SoftLogDivider); //write a leading delimiter for LogWriteSettingsInfo() if we don't restart the log.
 
                     StartMonitor();
                 }
@@ -253,6 +250,7 @@ namespace NetworkOnlineMonitor
             int testInterval = settings.TestInterval * 1000; //pre-convert to ms
             long offlineTrigger = settings.OfflineTrigger * TimeSpan.TicksPerSecond; //compute to ticks
 
+            LogFaultStart = 0;
             var ping = new PingTest(settings.PingTimeout);
             int targetIndex = 0;
             while (!CancelWork)
@@ -290,7 +288,7 @@ namespace NetworkOnlineMonitor
                     {
                         t.Icon = Resources.SphereGreen24;
                         t.Response = ping.ResponseTime;
-                    },true);
+                    });
                 }
                 else
                 {
@@ -298,7 +296,7 @@ namespace NetworkOnlineMonitor
                     {
                         t.Icon = Resources.SphereRed24;
                         t.Response = ping.ResponseTime;
-                    },true);
+                    });
                     if (LogFaultStart == 0) //ping failed, start counting.
                     {
                         LogFaultStart = StaticTools.UtcTimerTicks;
@@ -314,14 +312,17 @@ namespace NetworkOnlineMonitor
                 }
             }
 
-            if (LogFaultStart!=0) LogNetworkDown(LogFaultStart, Targets[0].Response); //flush any outstanding network down messages.
-            LogFaultStart = 0;
+            if (LogFaultStart != 0)
+            {
+                //flush any outstanding network down messages.
+                LogNetworkDown(LogFaultStart, Targets[0].Response);
+                UpdateUILastFault();
+            }
             ping.Dispose();
             Debug.WriteLine($"Monitor Stopped");
         }
 
         private enum UIState { Stop, Start , Online, Offline }
-        private bool CurrentFailStop = false;
         private void UpdateUI(UIState uiState, PingTest ping=null)
         {
             Debug.WriteLine($"UpdateUI: {uiState}");
@@ -348,13 +349,13 @@ namespace NetworkOnlineMonitor
                     m_txtPingInterval.Text = settings.TestInterval.ToString() + " seconds";
                     m_txtOfflineTrigger.Text = settings.OfflineTrigger.ToString() + " seconds";
                     m_txtPingTimeout.Text = settings.PingTimeout.ToString() + " ms";
-                }, true);
+                });
                 return;
             }
 
             if (uiState == UIState.Stop)
             {
-                CurrentFailStop = true;
+                StopCurrentFailUICounter();
                 CallForm(() =>
                 {
                     m_grpPingTests.Enabled = false;
@@ -382,15 +383,14 @@ namespace NetworkOnlineMonitor
                     this.m_grpStatus.BorderColor = Color.LightGray;
                     this.m_MenuStrip.BackColor = Color.Gainsboro;
 
-                    m_TrayIcon.Icon = global::NetworkOnlineMonitor.Properties.Resources.favicon;
-                    //this.Icon = global::NetworkOnlineMonitor.Properties.Resources.favicon;
-                }, true);
+                    m_TrayIcon.Icon = Resources.favicon;
+                });
                 return;
             }
 
             if (uiState == UIState.Online)
             {
-                CurrentFailStop = true;
+                StopCurrentFailUICounter();
                 CallForm(() =>
                 {
                     m_grpPingTests.Enabled = true;
@@ -412,15 +412,10 @@ namespace NetworkOnlineMonitor
                     this.m_grpStatus.BorderColor = Color.LightGray;
                     this.m_MenuStrip.BackColor = Color.Gainsboro;
 
-                    m_TrayIcon.Icon = global::NetworkOnlineMonitor.Properties.Resources.favicon;
-                    //this.Icon = global::NetworkOnlineMonitor.Properties.Resources.favicon;
+                    m_TrayIcon.Icon = Resources.favicon;
 
-                    m_txtLastFailureStart.Text = new DateTime(LogFaultStart, DateTimeKind.Utc).ToLocalTime().ToString("G");
-                    long tickduration = StaticTools.UtcTimerTicks - LogFaultStart;
-                    DownTimeList.Add(tickduration); //Add to tick downtime duration array
-                    m_txtLastFailDuration.Text = TimeSpanFormat(tickduration);
-                    m_txtFailureCount.Text = DownTimeList.Count.ToString();
-                }, true);
+                    UpdateUILastFault();
+                });
                 return;
             }
 
@@ -451,9 +446,8 @@ namespace NetworkOnlineMonitor
                     this.m_grpStatus.BorderColor = highlight;
                     this.m_MenuStrip.BackColor = Color.FromArgb(255, 255, 209, 204);
 
-                    m_TrayIcon.Icon = global::NetworkOnlineMonitor.Properties.Resources.favicon_Red;
-                    //this.Icon = global::NetworkOnlineMonitor.Properties.Resources.favicon_Red;
-                }, true);
+                    m_TrayIcon.Icon = Resources.favicon_Red;
+                });
 
                 if (!ping.Send(Targets[0].Address, 100))
                 {
@@ -461,16 +455,27 @@ namespace NetworkOnlineMonitor
                     {
                         m_pbLanStatus.Image = Resources.LanDown64;
                         m_txtLanStatus.Text = Resources.LanDownText;
-                    }, true);
+                    });
                 }
                 Targets[0].Response = ping.ResponseTime;
 
-                Debug.WriteLine($"UpdateUI: {uiState} LAN Ping {(ping.Success?"Success":"Failed")}"+ (ping.Success ? $" Response={ping.ResponseTime}ms":""));
+                Debug.WriteLine($"UpdateUI: {uiState} LAN Ping {(ping.Success ? "Success" : "Failed")}" + (ping.Success ? $" Response={ping.ResponseTime}ms" : ""));
 
-                CurrentFailStop = false;
-                Task.Run(() => CurrentFailDuration(ref CurrentFailStop), CancelToken);
+                Task.Run(() => StartCurrentFailUICounter(), CancelToken);
                 return;
             }
+        }
+
+        private void UpdateUILastFault()
+        {
+            if (LogFaultStart <= 0) return;
+            CallForm(() =>
+            {
+                m_txtLastFailureStart.Text = new DateTime(LogFaultStart, DateTimeKind.Utc).ToLocalTime().ToString("G");
+                DownTimeList.Add(StaticTools.UtcTimerTicks - LogFaultStart); //Add to tick downtime duration array
+                m_txtLastFailDuration.Text = TimeSpanFormat(DownTimeList[DownTimeList.Count - 1]);
+                m_txtFailureCount.Text = DownTimeList.Count.ToString();
+            });
         }
 
         /// <summary>
@@ -479,13 +484,14 @@ namespace NetworkOnlineMonitor
         /// </summary>
         /// <param name="command">Action to perform.</param>
         /// <param name="force">True to force the action in spite that this may be a minimized window.</param>
-        private void CallForm(Action command, bool force = false) //Invoke takes a delegate. Pre-cast to Action type
+        private void CallForm(Action command, bool force = true) //Invoke takes a delegate. Pre-cast to Action type
         {
             if (force || this.WindowState != FormWindowState.Minimized)
             {
                 if (this.InvokeRequired)
                 {
-                    try { this.Invoke(command); } catch { }  //Hide ThreadAbortException
+                    //Hide ThreadAbortException and ObjectDisposedException. Occurs when application exiting.
+                    try { this.Invoke(command); } catch { }
                 }
                 else
                 {
@@ -505,34 +511,37 @@ namespace NetworkOnlineMonitor
             Sound.Play(settings.ReconnectSoundClip.FileName, settings.ReconnectSoundClip.Volume);
         }
 
-        private void CurrentFailDuration(ref bool stop)
+        private bool _CancelCurrentFailUICounter = false;
+        private void StopCurrentFailUICounter() => _CancelCurrentFailUICounter = true;
+        private void StartCurrentFailUICounter()
         {
+            _CancelCurrentFailUICounter = false;
             Debug.WriteLine("CurrentFailDuration Started");
 
             var started = StaticTools.UtcTimerTicks;
-            if (!CancelWork && !stop)
+            if (!CancelWork && !_CancelCurrentFailUICounter)
             {
                 CallForm(() =>
                 {
                     m_lblCurrentFailDuration.Visible = true;
                     m_txtCurrentFailDuration.Visible = true;
-                }, true);
+                });
             }
 
             while (true)
             {
-                if (CancelWork || stop)
+                if (CancelWork || _CancelCurrentFailUICounter)
                 {
                     CallForm(() =>
                     {
                         m_lblCurrentFailDuration.Visible = false;
                         m_txtCurrentFailDuration.Visible = false;
                         m_txtCurrentFailDuration.Text = "00:00:00";
-                    }, true);
+                    });
                     Debug.WriteLine("CurrentFailDuration Ended");
                     return;
                 }
-                CallForm(() => m_txtCurrentFailDuration.Text = TimeSpanFormat(StaticTools.UtcTimerTicks - started));
+                CallForm(() => m_txtCurrentFailDuration.Text = TimeSpanFormat(StaticTools.UtcTimerTicks - started), false);
                 SpinWait.SpinUntil(() => CancelWork, 1000);
             }
         }
@@ -558,7 +567,7 @@ namespace NetworkOnlineMonitor
 
             while (!CancelWork)
             {
-                CallForm(() => m_txtMonitorDuration.Text = TimeSpanFormat(StaticTools.UtcTimerTicks - started));
+                CallForm(() => m_txtMonitorDuration.Text = TimeSpanFormat(StaticTools.UtcTimerTicks - started), false);
                 SpinWait.SpinUntil(() => CancelWork, 1000);
             }
             Debug.WriteLine("MonitorDuration Ended");
@@ -568,18 +577,20 @@ namespace NetworkOnlineMonitor
         private void LogWriteSettingsInfo()
         {
             int i = 0;
+            Log.WriteSoftDivider();
             var sb = new StringBuilder();
             Array.ForEach(settings.Targets, t => sb.AppendLine($"Ping Target {++i}: {t.AddressStr} - {t.Name}"));
             sb.Append("Wait for Ping (milliseconds): "); sb.AppendLine(settings.PingTimeout.ToString());
             sb.Append("Test Interval (seconds): "); sb.AppendLine(settings.TestInterval.ToString());
-            sb.Append("Log Failure Longer Than (seconds): "); sb.AppendLine(settings.OfflineTrigger.ToString());
-            sb.Append(SoftLogDivider);
+            sb.Append("Log Failure Longer Than (seconds): "); sb.Append(settings.OfflineTrigger.ToString());
             Log.WriteLine(sb.ToString());
+            Log.WriteSoftDivider();
         }
 
         //This is written when the network is back up after a failure.
         private void LogNetworkDown(long faultStartTimeTicks, int lanResponseTimeMs)
         {
+            if (faultStartTimeTicks <= 0) throw new ArgumentOutOfRangeException(nameof(faultStartTimeTicks), faultStartTimeTicks, $"{nameof(faultStartTimeTicks)} is <= 0");
             string duration = TimeSpanFormat(TimeSpan.FromTicks(StaticTools.UtcTimerTicks - faultStartTimeTicks));
             DateTime startDate = new DateTime(faultStartTimeTicks,DateTimeKind.Utc).ToLocalTime();
 
@@ -595,9 +606,8 @@ namespace NetworkOnlineMonitor
             DateTime now = DateTime.Now;
             var szMonitoredDuration = m_txtMonitorDuration.Text;
             TimeSpan monitoredDuration = TimeSpanParse(szMonitoredDuration);
+            Log.WriteSoftDivider();
             var sb = new StringBuilder();
-
-            sb.AppendLine(SoftLogDivider);
             sb.AppendLine($"Log End {now:G}");
             sb.AppendLine($"Monitor Duration {szMonitoredDuration}");
 
@@ -619,6 +629,7 @@ namespace NetworkOnlineMonitor
                 sb.Append($"(No Failures)");
 
             Log.WriteLine(sb.ToString());
+            Log.WriteSoftDivider();
         }
 
         private static string TimeSpanFormat(TimeSpan tsp) => $"{(int)tsp.TotalHours:#0}:{tsp.Minutes:00}:{tsp.Seconds:00}";

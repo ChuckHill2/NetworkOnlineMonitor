@@ -300,6 +300,7 @@ namespace NetworkOnlineMonitor
             // When App is started when the network is down an exception occurs.
             // When App is running and the network goes down, this allows this function to still get the initial valid LanInfo.
             if (_LanInfo.ComputerName != null) return _LanInfo;
+            bool cacheResult = true;
 
             var myComputerName = Dns.GetHostName();
 
@@ -310,7 +311,7 @@ namespace NetworkOnlineMonitor
 
             //https://stackoverflow.com/questions/13634868/get-the-default-gateway
             IPAddress gateway = NetworkInterface.GetAllNetworkInterfaces()
-                .Where(n => n.OperationalStatus == OperationalStatus.Up)
+                .Where(n => n.OperationalStatus == OperationalStatus.Up) //<--this is important!
                 .Where(n => n.NetworkInterfaceType != NetworkInterfaceType.Loopback)
                 .SelectMany(n => n.GetIPProperties()?.GatewayAddresses)
                 .Select(g => g?.Address)
@@ -319,12 +320,27 @@ namespace NetworkOnlineMonitor
                 .Where(a => Array.FindIndex(a.GetAddressBytes(), b => b != 0) >= 0)
                 .FirstOrDefault();
 
-            //This app is non-functional without internet access! We need to ping the router!
             if (gateway == null)
             {
-                MessageBox.Show(Application.OpenForms.Count > 0 ? Application.OpenForms[0] : null, "Your Wi-Fi or internet cable is\r\ndisconnected. Check your settings.", "Network Connection", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                Application.Exit(); //This essentially posts FormMain.Close(), so this app continues. Same as Application.OpenForms[0].Close();
-                return new LanInfo(myComputerName, myAddresses.OrderByDescending(m => m.Value).FirstOrDefault()?.Key.ToString() ?? "127.0.0.1", gateway?.ToString() ?? "127.0.0.1");
+                cacheResult = false;
+                //We try again but without currently being in use
+                gateway = NetworkInterface.GetAllNetworkInterfaces()
+                                //.Where(n => n.OperationalStatus == OperationalStatus.Up)
+                                .Where(n => n.NetworkInterfaceType != NetworkInterfaceType.Loopback)
+                                .SelectMany(n => n.GetIPProperties()?.GatewayAddresses)
+                                .Select(g => g?.Address)
+                                .Where(a => a != null)
+                                .Where(a => a.AddressFamily == AddressFamily.InterNetwork)
+                                .Where(a => Array.FindIndex(a.GetAddressBytes(), b => b != 0) >= 0)
+                                .FirstOrDefault();
+
+                //This app is non-functional without knowledge of the gateway! We need to ping the router!
+                if (gateway == null)
+                {
+                    MessageBox.Show(Application.OpenForms.Count > 0 ? Application.OpenForms[0] : null, "Your Wi-Fi or internet cable is\r\ndisconnected. Check your settings.", "Network Connection", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    Application.Exit(); //This essentially posts FormMain.Close(), so this app continues. Same as Application.OpenForms[0].Close();
+                    return new LanInfo("[Gateway Unknown]", "127.0.0.1", "127.0.0.1");
+                }
             }
 
             //Find my computer address that is closest match to gateway/router IP (e.g. same domain)
@@ -340,8 +356,9 @@ namespace NetworkOnlineMonitor
                 kv.Value = i;
             }
 
-            _LanInfo = new LanInfo(myComputerName, myAddresses.OrderByDescending(m => m.Value).FirstOrDefault()?.Key.ToString() ?? "127.0.0.1", gateway?.ToString() ?? "127.0.0.1");
-            return _LanInfo;
+            var li = new LanInfo(myComputerName, myAddresses.OrderByDescending(m => m.Value).FirstOrDefault()?.Key.ToString() ?? "127.0.0.1", gateway?.ToString() ?? "127.0.0.1");
+            if (cacheResult) _LanInfo = li;
+            return li;
         }
         private static LanInfo _LanInfo;
 
