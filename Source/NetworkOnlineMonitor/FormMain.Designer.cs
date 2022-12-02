@@ -132,6 +132,8 @@ namespace NetworkOnlineMonitor
             // 
             // m_ctxTrayMenuItemExit
             // 
+            this.m_ctxTrayMenuItemExit.Font = new System.Drawing.Font("Segoe UI Semibold", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.m_ctxTrayMenuItemExit.ForeColor = System.Drawing.Color.Crimson;
             this.m_ctxTrayMenuItemExit.Image = global::NetworkOnlineMonitor.Properties.Resources.Close16;
             this.m_ctxTrayMenuItemExit.Name = "m_ctxTrayMenuItemExit";
             this.m_ctxTrayMenuItemExit.Size = new System.Drawing.Size(103, 22);
