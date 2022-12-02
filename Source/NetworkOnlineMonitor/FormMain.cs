@@ -587,7 +587,7 @@ namespace NetworkOnlineMonitor
             Log.WriteSoftDivider();
         }
 
-        //This is written when the network is back up after a failure.
+        //This is written when the network is back up after a failure. Done this way in order to get the failure duration.
         private void LogNetworkDown(long faultStartTimeTicks, int lanResponseTimeMs)
         {
             if (faultStartTimeTicks <= 0) throw new ArgumentOutOfRangeException(nameof(faultStartTimeTicks), faultStartTimeTicks, $"{nameof(faultStartTimeTicks)} is <= 0");
@@ -650,9 +650,9 @@ namespace NetworkOnlineMonitor
             {
                 //By our definition, the first target element is always the LAN.
                 new Target("Gateway",IPAddress.Parse(lanInfo.GatewayAddess),null,null,null,100),
-                new Target(settings.Targets[0].Name, settings.Targets[0].Address,m_pbTestTarget1, m_lblTestTarget1, m_lblTestTarget1Resp, settings.PingTimeout),
-                new Target(settings.Targets[1].Name, settings.Targets[1].Address,m_pbTestTarget2, m_lblTestTarget2, m_lblTestTarget2Resp, settings.PingTimeout),
-                new Target(settings.Targets[2].Name, settings.Targets[2].Address,m_pbTestTarget3, m_lblTestTarget3, m_lblTestTarget3Resp, settings.PingTimeout),
+                new Target(settings.Targets[0].Name, settings.Targets[0].Address, m_pbTestTarget1, m_lblTestTarget1, m_lblTestTarget1Resp, settings.PingTimeout),
+                new Target(settings.Targets[1].Name, settings.Targets[1].Address, m_pbTestTarget2, m_lblTestTarget2, m_lblTestTarget2Resp, settings.PingTimeout),
+                new Target(settings.Targets[2].Name, settings.Targets[2].Address, m_pbTestTarget3, m_lblTestTarget3, m_lblTestTarget3Resp, settings.PingTimeout),
             };
         }
 
@@ -724,7 +724,7 @@ namespace NetworkOnlineMonitor
                 var addr = Address.ToString();
                 name = name ?? "NONAME";
                 Name = $"{name}\n{addr}";
-                toStringValue = $"{name} ({addr})"; //pre-computed because the controls may be null
+                toStringValue = $"{name} ({addr})"; //pre-computed.
             }
 
             public override string ToString() => toStringValue;
