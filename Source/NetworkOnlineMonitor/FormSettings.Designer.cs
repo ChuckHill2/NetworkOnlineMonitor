@@ -454,8 +454,7 @@ namespace NetworkOnlineMonitor
             this.m_soundclipReconnect.Location = new System.Drawing.Point(14, 21);
             this.m_soundclipReconnect.Name = "m_soundclipReconnect";
             this.m_soundclipReconnect.Size = new System.Drawing.Size(363, 89);
-            soundClip1.FileName = "[None]";
-            this.m_soundclipReconnect.SoundClip = soundClip1;
+            this.m_soundclipReconnect.SoundClip = SoundClip.None;
             this.m_soundclipReconnect.TabIndex = 0;
             // 
             // m_grpFailureAlertSound
@@ -478,7 +477,7 @@ namespace NetworkOnlineMonitor
             this.m_soundclipAlert.Location = new System.Drawing.Point(14, 21);
             this.m_soundclipAlert.Name = "m_soundclipAlert";
             this.m_soundclipAlert.Size = new System.Drawing.Size(363, 89);
-            this.m_soundclipAlert.SoundClip = soundClip1;
+            this.m_soundclipAlert.SoundClip = SoundClip.None;
             this.m_soundclipAlert.TabIndex = 0;
             // 
             // m_grpLogFileOption
@@ -507,7 +506,6 @@ namespace NetworkOnlineMonitor
             this.m_txtLogFileLocation.Size = new System.Drawing.Size(342, 20);
             this.m_txtLogFileLocation.TabIndex = 13;
             this.m_txtLogFileLocation.TextLabel = "Log File Location";
-            this.m_ToolTips.SetToolTip(this.m_txtLogFileLocation, "The destination where\r\nthe log file will reside.");
             // 
             // m_btnLogFileLocation
             // 

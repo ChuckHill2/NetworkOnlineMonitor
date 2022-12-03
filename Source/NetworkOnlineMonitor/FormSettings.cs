@@ -62,10 +62,12 @@ namespace NetworkOnlineMonitor
             m_radNewLogFile.Checked = settings.LogFileOption == LogFileOption.CreateNew;
             m_radAppendLogFile.Checked = settings.LogFileOption == LogFileOption.Append;
             m_radNoLogFile.Checked = settings.LogFileOption == LogFileOption.None;
-            if (!m_radNoLogFile.Checked) m_txtLogFileLocation.Text = settings.LogFileFolder;
+            if (!m_radNoLogFile.Checked) m_txtLogFileLocation.Text = settings.LogFileFolder==Settings.DefaultFolder ? string.Empty: settings.LogFileFolder;
 
             m_soundclipAlert.SoundClip = settings.AlertSoundClip;
             m_soundclipReconnect.SoundClip = settings.ReconnectSoundClip;
+
+            this.m_ToolTips.SetToolTip(this.m_txtLogFileLocation, $"The destination where the log file will reside.\r\nThe default is {Settings.DefaultFolder}.");
         }
 
         private Settings GetNewSettings()
