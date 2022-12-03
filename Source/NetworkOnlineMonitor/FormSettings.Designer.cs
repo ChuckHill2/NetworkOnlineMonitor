@@ -31,6 +31,7 @@ namespace NetworkOnlineMonitor
         {
             this.components = new System.ComponentModel.Container();
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(FormSettings));
+            NetworkOnlineMonitor.SoundClip soundClip1 = new NetworkOnlineMonitor.SoundClip();
             this.m_pnlTest = new System.Windows.Forms.Panel();
             this.m_txtGatewayIPAddress = new System.Windows.Forms.Label();
             this.m_txtLanIPAddress = new System.Windows.Forms.Label();
@@ -72,6 +73,7 @@ namespace NetworkOnlineMonitor
             this.m_chkPopup = new System.Windows.Forms.CheckBox();
             this.m_lblAlertLogSettiings = new System.Windows.Forms.Label();
             this.m_ToolTips = new System.Windows.Forms.ToolTip(this.components);
+            this.m_grpEmpty = new System.Windows.Forms.GroupBox();
             this.m_pnlTest.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.m_numTestInterval)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.m_numPingResp)).BeginInit();
@@ -86,6 +88,7 @@ namespace NetworkOnlineMonitor
             // m_pnlTest
             // 
             this.m_pnlTest.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            this.m_pnlTest.Controls.Add(this.m_grpEmpty);
             this.m_pnlTest.Controls.Add(this.m_txtGatewayIPAddress);
             this.m_pnlTest.Controls.Add(this.m_txtLanIPAddress);
             this.m_pnlTest.Controls.Add(this.m_txtComputerName);
@@ -454,7 +457,8 @@ namespace NetworkOnlineMonitor
             this.m_soundclipReconnect.Location = new System.Drawing.Point(14, 21);
             this.m_soundclipReconnect.Name = "m_soundclipReconnect";
             this.m_soundclipReconnect.Size = new System.Drawing.Size(363, 89);
-            this.m_soundclipReconnect.SoundClip = SoundClip.None;
+            soundClip1.FileName = "[None]";
+            this.m_soundclipReconnect.SoundClip = soundClip1;
             this.m_soundclipReconnect.TabIndex = 0;
             // 
             // m_grpFailureAlertSound
@@ -477,7 +481,7 @@ namespace NetworkOnlineMonitor
             this.m_soundclipAlert.Location = new System.Drawing.Point(14, 21);
             this.m_soundclipAlert.Name = "m_soundclipAlert";
             this.m_soundclipAlert.Size = new System.Drawing.Size(363, 89);
-            this.m_soundclipAlert.SoundClip = SoundClip.None;
+            this.m_soundclipAlert.SoundClip = soundClip1;
             this.m_soundclipAlert.TabIndex = 0;
             // 
             // m_grpLogFileOption
@@ -606,6 +610,14 @@ namespace NetworkOnlineMonitor
             this.m_lblAlertLogSettiings.TabIndex = 1;
             this.m_lblAlertLogSettiings.Text = "Alert && Log Settings…";
             // 
+            // m_grpEmpty
+            // 
+            this.m_grpEmpty.Location = new System.Drawing.Point(14, 310);
+            this.m_grpEmpty.Name = "m_grpEmpty";
+            this.m_grpEmpty.Size = new System.Drawing.Size(346, 38);
+            this.m_grpEmpty.TabIndex = 22;
+            this.m_grpEmpty.TabStop = false;
+            // 
             // FormSettings
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
@@ -683,5 +695,6 @@ namespace NetworkOnlineMonitor
         private System.Windows.Forms.Label m_txtGatewayIPAddress;
         private SoundClipCtrl m_soundclipAlert;
         private SoundClipCtrl m_soundclipReconnect;
+        private System.Windows.Forms.GroupBox m_grpEmpty;
     }
 }
