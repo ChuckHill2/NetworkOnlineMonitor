@@ -31,7 +31,6 @@ namespace NetworkOnlineMonitor
         {
             this.components = new System.ComponentModel.Container();
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(FormSettings));
-            NetworkOnlineMonitor.SoundClip soundClip1 = new NetworkOnlineMonitor.SoundClip();
             this.m_pnlTest = new System.Windows.Forms.Panel();
             this.m_txtGatewayIPAddress = new System.Windows.Forms.Label();
             this.m_txtLanIPAddress = new System.Windows.Forms.Label();

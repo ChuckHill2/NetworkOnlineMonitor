@@ -35,6 +35,7 @@ namespace NetworkOnlineMonitor
     public class Settings: IEquatable<Settings>
     {
         private static readonly string XmlPath = Path.ChangeExtension(StaticTools.ExecutableName, ".xml"); //For serialization/deserialization.
+        public static readonly string DefaultFolder = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
 
         /// <summary>
         /// Position of window on the screen. This is the saved location from the previous instance.
@@ -42,67 +43,68 @@ namespace NetworkOnlineMonitor
         [XmlElement(Order = 1)]
         public MyPoint MainFormLocation { get; set; } = Point.Empty;
 
+        //Unused because the registry entry determines value
+        //public bool StartWhenWindowStarts { get; set; } = false;
+
         /// <summary>
         /// Automatically start minimized to the system tray.
         /// </summary>
-        [XmlElement(Order = 3), DefaultValue(false)] 
+        [XmlElement(Order = 2)] 
         public bool StartMinimized { get; set; } = false;
 
         /// <summary>
         /// Run a ping test every this many seconds.
         /// </summary>
-        [XmlElement(Order = 4), DefaultValue(5)]
+        [XmlElement(Order = 3)]
         public int TestInterval { get; set; } = 5;  //seconds
 
         /// <summary>
         /// How long to wait for a ping response before giving up in ms.
         /// </summary>
-        [XmlElement(Order = 5), DefaultValue(200)] 
+        [XmlElement(Order = 4)] 
         public int PingTimeout { get; set; } = 200; //ms
 
         /// <summary>
         /// The array of the 3 ping targets containing the name associated IPv4 address.
         /// </summary>
-        [XmlArray("Targets", Order = 6), XmlArrayItem("Target")]
+        [XmlArray("Targets", Order = 5), XmlArrayItem("Target")]
         public TargetIP[] Targets;
 
         /// <summary>
         /// Popup the window when a fault (network down) lasts longer than 'LogMinLength'.
         /// </summary>
-        [XmlElement(Order = 7), DefaultValue(false)]
+        [XmlElement(Order = 6)]
         public bool PopUpOnFailure { get; set; } = false;
 
         /// <summary>
         /// Show and log the fault  (network down) if the fault lasts longer than this amount of time (seconds)
         /// </summary>
-        [XmlElement(Order = 8), DefaultValue(5)]
-        public int OfflineTrigger { get; set; } = 5; //seconds
+        [XmlElement(Order = 7)]
+        public int OfflineTrigger { get; set; } = 10; //seconds
 
         /// <summary>
         /// The folder where the log file is to reside. The name part is hardcoded to "[exename]Log*.txt".
         /// </summary>
-        [XmlElement(Order = 9), DefaultValue("")]
+        /// <remarks>
+        /// DefaultValueAttribute(null) is not null but the the value of DefaultFolder. This dynamic default is defined in this.Serialize().  
+        /// </remarks>
+        [XmlElement(Order = 8)]
         public string LogFileFolder
         {
             get
             {
-                if (string.IsNullOrWhiteSpace(_LogFileFolder) || !Directory.Exists(_LogFileFolder))
-                    _LogFileFolder = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                if (string.IsNullOrWhiteSpace(_LogFileFolder) || !Directory.Exists(_LogFileFolder)) _LogFileFolder = DefaultFolder;
                 return _LogFileFolder;
             }
-            set
-            {
-                if (string.IsNullOrWhiteSpace(value) || !Directory.Exists(value)) return;
-                _LogFileFolder = value;
-            }
+            set => _LogFileFolder = string.IsNullOrWhiteSpace(value) || !Directory.Exists(value) || DefaultFolder.Equals(value, StringComparison.CurrentCultureIgnoreCase) ? string.Empty : value;
         }
         private string _LogFileFolder;
 
         /// <summary>
         /// Specifies how the Log file should be opened.
         /// </summary>
-        [XmlElement(Order = 10), DefaultValue(LogFileOption.CreateNew)]
-        public LogFileOption LogFileOption { get; set; } = LogFileOption.CreateNew;
+        [XmlElement(Order = 9)]
+        public LogFileOption LogFileOption { get; set; } = LogFileOption.Append;
 
         /// <summary>
         /// Get the full logging file path based upon 'LogFileOption' and 'LogFileFolder'.
@@ -126,14 +128,14 @@ namespace NetworkOnlineMonitor
         /// <summary>
         /// Sound clip to play when network dropped/offline.
         /// </summary>
-        [XmlElement(Order = 11)]
-        public SoundClip AlertSoundClip { get; set; }
+        [XmlElement(Order = 10)]
+        public SoundClip AlertSoundClip { get; set; } = SoundClip.None;
 
         /// <summary>
         /// Sound clip to play when network reconnected
         /// </summary>
-        [XmlElement(Order = 12)]
-        public SoundClip ReconnectSoundClip { get; set; }
+        [XmlElement(Order = 11)]
+        public SoundClip ReconnectSoundClip { get; set; } = SoundClip.None;
 
         /// <summary>
         /// Parameterless constructor for xml deserialization with default values.
@@ -147,8 +149,6 @@ namespace NetworkOnlineMonitor
                 new TargetIP("Level3", "4.2.2.2"),
                 new TargetIP("Cloudflare", "1.1.1.1")
             };
-            AlertSoundClip = SoundClip.None;
-            ReconnectSoundClip = SoundClip.None;
         }
 
         public bool Equals(Settings other)
@@ -204,6 +204,7 @@ namespace NetworkOnlineMonitor
         public static Settings Deserialize(FileLogging Log=null)
         {
             if (!File.Exists(XmlPath)) return new Settings();
+
             var xs = new XmlSerializer(typeof(Settings));
             try
             {
