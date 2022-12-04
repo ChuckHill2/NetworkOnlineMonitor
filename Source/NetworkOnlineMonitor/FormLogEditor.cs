@@ -43,6 +43,7 @@ namespace NetworkOnlineMonitor
                 Changed = true;
             };
         }
+        protected override void OnShown(EventArgs e) => m_txtLog.ScrollToCaret();
         protected override void OnFormClosed(FormClosedEventArgs e) => this.Dispose();
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
