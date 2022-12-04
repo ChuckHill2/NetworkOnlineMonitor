@@ -37,7 +37,6 @@ namespace NetworkOnlineMonitor
             this.m_txtLog.BackColor = System.Drawing.SystemColors.Control;
             this.m_txtLog.Dock = System.Windows.Forms.DockStyle.Fill;
             this.m_txtLog.Font = new System.Drawing.Font("Consolas", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.Icon = global::NetworkOnlineMonitor.Properties.Resources.favicon;
             this.m_txtLog.Location = new System.Drawing.Point(0, 0);
             this.m_txtLog.MaxLength = 104858624;
             this.m_txtLog.Multiline = true;
@@ -48,18 +47,20 @@ namespace NetworkOnlineMonitor
             this.m_txtLog.Text = "Log";
             this.m_txtLog.WordWrap = false;
             // 
-            // FormLogEdit
+            // FormLogEditor
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(777, 751);
             this.Controls.Add(this.m_txtLog);
             this.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.Icon = global::NetworkOnlineMonitor.Properties.Resources.favicon;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
-            this.Name = "FormLogEdit";
+            this.Name = "FormLogEditor";
             this.ShowInTaskbar = false;
             this.SizeGripStyle = System.Windows.Forms.SizeGripStyle.Show;
+            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
             this.Text = "Edit Log [Filename]";
             this.ResumeLayout(false);
             this.PerformLayout();
