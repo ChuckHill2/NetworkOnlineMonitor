@@ -26,12 +26,12 @@ namespace NetworkOnlineMonitor
         private CaptionBarCloseButton CloseButtonHandler; //Reassign the close button to minimize app to the system tray.
         private Task MonitorTask;         //Handle to wait for task exit
         private Target[] Targets;         //List of ping targets where index 0 is the LAN gateway address.
-        private FileLogging Log;         //Log the monitored events.
-        private bool CancelWork = false;  //We use 2 forms of cancellation: a bool flag and cancel token, maybe overkill?
-        private CancellationTokenSource CancelTokenSource;
-        private CancellationToken CancelToken;
+        private FileLogging Log;          //Log the monitored events.
+        private bool CancelWork = false;  //Cancellation flag (we don't use CancelToken because it may end task prematurely.
         private Thread MonitorThread;     //Keep thread for MonitorStop() just in case Monitor() refuses to stop. Monitor() set's this.
         private long LogFaultStart = 0;   //needs to be global to support tray tooltip. Set and used in Monitor() and used in m_TrayIcon.MouseMove.
+        private bool IsDisposing = false; //stop updating the UI after Exit button pressed.
+        private string MonitorDurationString = "00:00:00"; //Keep copy for Notify tooltip because CallForm will not update the control when minimized.
 
         private readonly List<long> DownTimeList = new List<long>();
 
@@ -67,6 +67,7 @@ namespace NetworkOnlineMonitor
 
             this.FormClosing += (s, e) =>
             {
+                IsDisposing = true; //disable UI updating
                 LogWriteFailureSummary();
                 StopMonitor();
             };
@@ -79,7 +80,7 @@ namespace NetworkOnlineMonitor
             m_TrayIcon.MouseMove += (s, e) =>
             {
                 if (!m_grpPingTests.Enabled) m_TrayIcon.Text = "Network Monitoring\r\nStopped";
-                else if (LogFaultStart == 0) m_TrayIcon.Text = "Network Monitor\r\nDuration " + TimeSpanFormat(StaticTools.UtcTimerTicks - MonitorDurationStartTicks);
+                else if (LogFaultStart == 0) m_TrayIcon.Text = "Network Monitor\r\nDuration " + MonitorDurationString;
                 else m_TrayIcon.Text = "Network Down\r\nDuration " + TimeSpanFormat(StaticTools.UtcTimerTicks - LogFaultStart);
             };
         }
@@ -102,7 +103,7 @@ namespace NetworkOnlineMonitor
             m_txtMonitorStarted.Text = DateTime.Now.ToString("G");
         }
 
-        private void m_tsExitMenuItem_Click(object sender, EventArgs e) => this.Close();
+        private void m_tsExitMenuItem_Click(object sender, EventArgs e) { IsDisposing = true; this.Close(); }
 
         private void m_tsSettingsMenuItem_Click(object sender, EventArgs e)
         {
@@ -126,6 +127,7 @@ namespace NetworkOnlineMonitor
                 if (doRestartMonitor)
                 {
                     StopMonitor();
+                    Debug.WriteLine($"m_tsSettingsMenuItem_Click: Restarting with new Settings.");
                     if (doRestartLog)
                     {
                         //changing logging.
@@ -204,14 +206,14 @@ namespace NetworkOnlineMonitor
         {
             Debug.WriteLine($"StopMonitor() Started");
             CancelWork = true;
-            CancelTokenSource?.Cancel();
 
             if (MonitorTask != null && !MonitorTask.IsCompleted)
             {
-                var ok = MonitorTask.Wait(settings.TestInterval*1000);
+                var ok = MonitorTask.Wait(1000*5);
                 if (!ok) 
                 {
-                    Debug.WriteLine($"StopMonitor via CancelWork failed after {settings.TestInterval} seconds"); 
+                    //We shouldn't get here. Some task did not exit nicely when CancelWork flag was set.
+                    Debug.WriteLine($"StopMonitor via CancelWork failed after 5 seconds"); 
                     MonitorThread?.Abort(); //We corrupt the Task with this so the only thing we can do is Dispose it.
                     ok = MonitorThread.Join(5000);  //However we can still use Thread API.
                 }
@@ -219,36 +221,33 @@ namespace NetworkOnlineMonitor
             }
             MonitorTask?.Dispose();
             MonitorTask = null;
-            CancelTokenSource?.Dispose();
-            CancelTokenSource = null;
             UpdateUI(UIState.Stop);
             Debug.WriteLine($"StopMonitor() Ended");
         }
 
         private void StartMonitor()
         {
-            Debug.WriteLine($"StartMonitor() Started");
             CancelWork = false;
-            CancelTokenSource = new CancellationTokenSource();
-            CancelToken = CancelTokenSource.Token;
+            Debug.WriteLine($"StartMonitor() Started");
             Targets = BuildTargets();
 
             UpdateUI(UIState.Start);
 
-            Task.Run(() => MonitorDuration(), CancelToken);
-            MonitorTask = Task.Run((Action)Monitor, CancelToken);
+            MonitorTask = Task.Run((Action)Monitor);
             Debug.WriteLine($"StartMonitor() Ended");
         }
 
         private void Monitor()
         {
-            Debug.WriteLine($"Monitor Started");
+            Debug.WriteLine($"Monitor() Started");
             MonitorThread = Thread.CurrentThread; //save this thread in case StopMonitor() needs to forceably abort this thread.
             bool faulted = false;
             long loopStart = 0;
             Target[] wanTargets = Targets.Skip(1).ToArray(); //skip the Lan target. All following targets are the WAN.
             int testInterval = settings.TestInterval * 1000; //pre-convert to ms
             long offlineTrigger = settings.OfflineTrigger * TimeSpan.TicksPerSecond; //compute to ticks
+
+            var durationTask = Task.Run(() => MonitorDuration());
 
             LogFaultStart = 0;
             var ping = new PingTest(settings.PingTimeout);
@@ -274,6 +273,7 @@ namespace NetworkOnlineMonitor
 
                 CallForm(() => t.Icon = Resources.SphereYellow24); //Blink yellow to show that we are in progress starting a ping.
                 SpinWait.SpinUntil(() => CancelWork, 100);
+                if (CancelWork) break;
 
                 if (ping.Send(t.Address))
                 {
@@ -319,13 +319,20 @@ namespace NetworkOnlineMonitor
                 UpdateUILastFault();
             }
             ping.Dispose();
-            Debug.WriteLine($"Monitor Stopped");
+
+            var ok = durationTask.Wait(1000 * 2);
+            if (!ok)
+            {
+                Debug.WriteLine($"MonitorDuration() FAILED to exit after 2 seconds.");
+            }
+
+            Debug.WriteLine($"Monitor() Ended");
         }
 
         private enum UIState { Stop, Start , Online, Offline }
         private void UpdateUI(UIState uiState, PingTest ping=null)
         {
-            Debug.WriteLine($"UpdateUI: {uiState}");
+            Debug.WriteLine($"UpdateUI({uiState})");
             if (uiState == UIState.Start)
             {
                 CallForm(() =>
@@ -461,7 +468,7 @@ namespace NetworkOnlineMonitor
 
                 Debug.WriteLine($"UpdateUI: {uiState} LAN Ping {(ping.Success ? "Success" : "Failed")}" + (ping.Success ? $" Response={ping.ResponseTime}ms" : ""));
 
-                Task.Run(() => StartCurrentFailUICounter(), CancelToken);
+                Task.Run(() => StartCurrentFailUICounter());
                 return;
             }
         }
@@ -486,6 +493,7 @@ namespace NetworkOnlineMonitor
         /// <param name="force">True to force the action in spite that this may be a minimized window.</param>
         private void CallForm(Action command, bool force = true) //Invoke takes a delegate. Pre-cast to Action type
         {
+            if (IsDisposing) return; //Exit button has been pressed.
             if (force || this.WindowState != FormWindowState.Minimized)
             {
                 if (this.InvokeRequired)
@@ -539,38 +547,35 @@ namespace NetworkOnlineMonitor
                         m_txtCurrentFailDuration.Text = "00:00:00";
                     });
                     Debug.WriteLine("CurrentFailDuration Ended");
-                    return;
+                    break;
                 }
                 CallForm(() => m_txtCurrentFailDuration.Text = TimeSpanFormat(StaticTools.UtcTimerTicks - started), false);
-                SpinWait.SpinUntil(() => CancelWork, 1000);
+                SpinWait.SpinUntil(() => CancelWork || _CancelCurrentFailUICounter, 1000);
             }
         }
 
-        private long MonitorDurationStartTicks = -1;
+        private long MonitorDurationEndTicks = -1;
         private void MonitorDuration()
         {
             Debug.WriteLine("MonitorDuration Started");
 
-            long started;
-
-            //Exclude time when monitoring was stopped.
-            if (MonitorDurationStartTicks == -1)
+            long started = StaticTools.UtcTimerTicks;
+            if (MonitorDurationEndTicks != -1)
             {
-                started = StaticTools.UtcTimerTicks;
-                MonitorDurationStartTicks = started;
-            }
-            else
-            {
-                started = StaticTools.UtcTimerTicks - MonitorDurationStartTicks;
-                MonitorDurationStartTicks = started;
+                started -= MonitorDurationEndTicks;
+                Debug.WriteLine($"MonitorDuration Offset={(MonitorDurationEndTicks)/TimeSpan.TicksPerMillisecond} ms");
             }
 
             while (!CancelWork)
             {
-                CallForm(() => m_txtMonitorDuration.Text = TimeSpanFormat(StaticTools.UtcTimerTicks - started), false);
+                MonitorDurationEndTicks = StaticTools.UtcTimerTicks - started;
+                //Keep copy for Notify tooltip because CallForm will not update the control when minimized.
+                MonitorDurationString = TimeSpanFormat(MonitorDurationEndTicks);
+                CallForm(() => m_txtMonitorDuration.Text = MonitorDurationString, false);
                 SpinWait.SpinUntil(() => CancelWork, 1000);
             }
-            Debug.WriteLine("MonitorDuration Ended");
+
+            Debug.WriteLine($"MonitorDuration Ended at {MonitorDurationEndTicks / TimeSpan.TicksPerMillisecond} ms");
         }
 
         //This is written at the beginning of the log and every time one of these Settings properties has changed.
