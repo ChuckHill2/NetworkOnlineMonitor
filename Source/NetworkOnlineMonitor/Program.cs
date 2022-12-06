@@ -1,6 +1,4 @@
 using System;
-using System.Diagnostics;
-using System.Threading;
 using System.Windows.Forms;
 
 namespace NetworkOnlineMonitor
@@ -16,7 +14,6 @@ namespace NetworkOnlineMonitor
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
-            //Application.Run(new XXXForm1());  //For testing/debugging fragments
             Application.Run(new FormMain());
         }
 

@@ -18,6 +18,8 @@ using NetworkOnlineMonitor.Properties;
 // Note: Identifiers for all controls on all forms consist of m_[2-3 letter control type][camel-case field name] 
 // This makes it much easier to to identify UI controls distinct from other methods and objects. This helps tremendously when using intellisense.
 
+//Excellent info on multi-threading: https://www.albahari.com/threading/
+
 namespace NetworkOnlineMonitor
 {
     public partial class FormMain : Form
@@ -27,8 +29,8 @@ namespace NetworkOnlineMonitor
         private Task MonitorTask;         //Handle to wait for task exit
         private Target[] Targets;         //List of ping targets where index 0 is the LAN gateway address.
         private FileLogging Log;          //Log the monitored events.
-        private bool CancelWork = false;  //Cancellation flag (we don't use CancelToken because it may end task prematurely.
-        private Thread MonitorThread;     //Keep thread for MonitorStop() just in case Monitor() refuses to stop. Monitor() set's this.
+        private bool CancelWork = false;  //KISS Cancellation flag (we don't use CancelToken because it may end task prematurely.
+        private Thread MonitorThread;     //Keep thread for MonitorStop() just in case Monitor() refuses to stop. Monitor() itself set's this.
         private long LogFaultStart = 0;   //needs to be global to support tray tooltip. Set and used in Monitor() and used in m_TrayIcon.MouseMove.
         private bool IsDisposing = false; //stop updating the UI after Exit button pressed.
         private string MonitorDurationString = "00:00:00"; //Keep copy for Notify tooltip because CallForm will not update the control when minimized.
@@ -38,11 +40,6 @@ namespace NetworkOnlineMonitor
         public FormMain()
         {
             InitializeComponent();
-
-            // Interesting replacement to Control.Invoke() ??
-            // private WindowsFormsSynchronizationContext Context = new WindowsFormsSynchronizationContext();
-            // Context.Send((f) => this.Text = "HelloWorld", null);
-
             settings = Settings.Deserialize();
 
             if (settings.MainFormLocation == Point.Empty) this.StartPosition = FormStartPosition.CenterScreen;
@@ -68,7 +65,11 @@ namespace NetworkOnlineMonitor
             this.FormClosing += (s, e) =>
             {
                 IsDisposing = true; //disable UI updating
-                LogWriteFailureSummary();
+                LogWriteFailureSummary(); 
+                Log.Dispose();
+                // If we are in the middle of a fault, StopMonitor() should be before LogWriteFailureSummary() as we 
+                // could loose the final fault stats. But we have a very narrow window to wrap up, before the process 
+                // is terminated. StopMonitor() may take many seconds to shutdown due to lengthy thread shutdowns.
                 StopMonitor();
             };
             this.FormClosed += (s, e) => 
@@ -108,42 +109,41 @@ namespace NetworkOnlineMonitor
         private void m_tsSettingsMenuItem_Click(object sender, EventArgs e)
         {
             var newSettings = FormSettings.Show(this, settings);
-            if (newSettings != null)
+            if (newSettings == null) return; //no change
+
+            bool doLogWriteNewSettings = !settings.Targets.SequenceEqual(newSettings.Targets)
+                || settings.TestInterval != newSettings.TestInterval
+                || settings.OfflineTrigger != newSettings.OfflineTrigger
+                || settings.PingTimeout != newSettings.PingTimeout;
+
+            bool doRestartLog = settings.LogFileOption != newSettings.LogFileOption
+                || !settings.LogFileFolder.Equals(newSettings.LogFileFolder, StringComparison.CurrentCultureIgnoreCase);
+
+            bool doRestartMonitor = doLogWriteNewSettings || doRestartLog
+                || settings.PopUpOnFailure != newSettings.PopUpOnFailure; //because we need to update this on the "Settings" groupbox.
+
+            settings = newSettings; //monitor uses these settings, so set before starting monitor.
+            settings.Serialize();
+
+            if (doRestartMonitor)
             {
-                bool doLogWriteNewSettings = !settings.Targets.SequenceEqual(newSettings.Targets)
-                    || settings.TestInterval != newSettings.TestInterval
-                    || settings.OfflineTrigger != newSettings.OfflineTrigger
-                    || settings.PingTimeout != newSettings.PingTimeout;
-
-                bool doRestartLog = settings.LogFileOption != newSettings.LogFileOption
-                    || !settings.LogFileFolder.Equals(newSettings.LogFileFolder, StringComparison.CurrentCultureIgnoreCase);
-
-                bool doRestartMonitor = doLogWriteNewSettings || doRestartLog
-                    || settings.PopUpOnFailure != newSettings.PopUpOnFailure; //because we need to update this on the "Settings" groupbox.
-
-                settings = newSettings; //monitor uses these settings, so set before starting monitor.
-                settings.Serialize();
-
-                if (doRestartMonitor)
+                StopMonitor();
+                Debug.WriteLine($"m_tsSettingsMenuItem_Click: Restarting with new Settings.");
+                if (doRestartLog)
                 {
-                    StopMonitor();
-                    Debug.WriteLine($"m_tsSettingsMenuItem_Click: Restarting with new Settings.");
-                    if (doRestartLog)
-                    {
-                        //changing logging.
-                        LogWriteFailureSummary();
-                        Log.Dispose();
-                        if (settings.LogFileOption == LogFileOption.None) Log = new FileLogging();
-                        else if (settings.LogFileOption == LogFileOption.CreateNew) Log = new FileLogging(settings.LogFilePath);
-                        else if (settings.LogFileOption == LogFileOption.Append) Log = new FileLogging(settings.LogFilePath, true);
-                        doLogWriteNewSettings = true;
-                    }
-
-                    StartMonitor();
+                    //changing logging.
+                    LogWriteFailureSummary();
+                    Log.Dispose();
+                    if (settings.LogFileOption == LogFileOption.None) Log = new FileLogging();
+                    else if (settings.LogFileOption == LogFileOption.CreateNew) Log = new FileLogging(settings.LogFilePath);
+                    else if (settings.LogFileOption == LogFileOption.Append) Log = new FileLogging(settings.LogFilePath, true);
+                    doLogWriteNewSettings = true;
                 }
 
-                if (doLogWriteNewSettings) LogWriteSettingsInfo();
+                StartMonitor();
             }
+
+            if (doLogWriteNewSettings) LogWriteSettingsInfo();
         }
 
         private void m_tsEditLogMenuItem_Click(object sender, EventArgs e)
@@ -634,7 +634,6 @@ namespace NetworkOnlineMonitor
                 sb.Append($"(No Failures)");
 
             Log.WriteLine(sb.ToString());
-            Log.WriteSoftDivider();
         }
 
         private static string TimeSpanFormat(TimeSpan tsp) => $"{(int)tsp.TotalHours:#0}:{tsp.Minutes:00}:{tsp.Seconds:00}";
