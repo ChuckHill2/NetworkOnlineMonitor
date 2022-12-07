@@ -1,10 +1,17 @@
+<style>
+td, th {
+   border: none!important;
+}
+</style>
+
+
 <table border=0 cellspacing=0 cellpadding=0 width="100%" style='width:100.0%; border-collapse:collapse; border:none'>
- <tr style='height:140'>
-  <td width=140 style='padding:0;vertical-align: middle;'>
+ <tr style='height:140; border: none'>
+  <td width=140 style='padding:0;vertical-align: middle;border: none'>
   <img width=139 height=139 src="Source/NetworkOnlineMonitor/Resources/AboutInfo Source/image0.png">
   </td>
-  <td style='padding:0; vertical-align: middle; font-size:20.0pt; font-weight:bold'>
-  The Network Online Monitor
+  <td style='padding:0; vertical-align: middle; font-size:20.0pt; font-weight:bold; border: none'>
+  # The Network Online Monitor
   </td>
  </tr>
 </table>
