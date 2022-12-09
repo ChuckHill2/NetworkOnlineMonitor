@@ -64,6 +64,14 @@ namespace NetworkOnlineMonitor
 
             this.FormClosing += (s, e) =>
             {
+                if (e.CloseReason == CloseReason.UserClosing
+                    && MiniMessageBox.ShowDialog(UserClosingOwner, "Are you sure you want to exit?",this.Text,
+                        MiniMessageBox.Buttons.YesNo,MiniMessageBox.Symbol.Question)==DialogResult.No)
+                {
+                    e.Cancel = true;
+                    return;
+                }
+
                 IsDisposing = true; //disable UI updating
                 LogWriteFailureSummary(); 
                 Log.Dispose();
@@ -104,7 +112,12 @@ namespace NetworkOnlineMonitor
             m_txtMonitorStarted.Text = DateTime.Now.ToString("G");
         }
 
-        private void m_tsExitMenuItem_Click(object sender, EventArgs e) { IsDisposing = true; this.Close(); }
+        private IWin32Window UserClosingOwner; //Used for positioniing the "Are you sure?" popup.
+        private void m_miExit_Click(object sender, EventArgs e)
+        {
+            UserClosingOwner = ((ToolStripMenuItem)sender).GetCurrentParent();
+            this.Close();
+        }
 
         private void m_tsSettingsMenuItem_Click(object sender, EventArgs e)
         {
@@ -179,7 +192,6 @@ namespace NetworkOnlineMonitor
             Show();
             this.WindowState = FormWindowState.Normal;
         }
-        private void m_ctxTrayMenuItemExit_Click(object sender, EventArgs e) => this.Close();
 
         private void m_TrayIcon_MouseDoubleClick(object sender, MouseEventArgs e)
         {

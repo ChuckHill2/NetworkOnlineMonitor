@@ -139,7 +139,7 @@ namespace NetworkOnlineMonitor
             this.m_ctxTrayMenuItemExit.Size = new System.Drawing.Size(103, 22);
             this.m_ctxTrayMenuItemExit.Text = "Exit";
             this.m_ctxTrayMenuItemExit.ToolTipText = "Exit this application.";
-            this.m_ctxTrayMenuItemExit.Click += new System.EventHandler(this.m_ctxTrayMenuItemExit_Click);
+            this.m_ctxTrayMenuItemExit.Click += new System.EventHandler(this.m_miExit_Click);
             // 
             // m_MenuStrip
             // 
@@ -171,7 +171,7 @@ namespace NetworkOnlineMonitor
             this.m_tsExitMenuItem.Size = new System.Drawing.Size(42, 24);
             this.m_tsExitMenuItem.Text = "Exit";
             this.m_tsExitMenuItem.ToolTipText = "Shutdown and \r\nexit this app.";
-            this.m_tsExitMenuItem.Click += new System.EventHandler(this.m_tsExitMenuItem_Click);
+            this.m_tsExitMenuItem.Click += new System.EventHandler(this.m_miExit_Click);
             // 
             // m_tsSettingsMenuItem
             // 
