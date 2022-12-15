@@ -35,14 +35,18 @@ namespace NetworkOnlineMonitor
             {
                 m_txtLog.Text = sr.ReadToEnd();
             }
-            m_txtLog.SelectionStart = m_txtLog.MaxLength;
+            m_txtLog.SelectionStart = m_txtLog.TextLength;
 
-            m_txtLog.TextChanged += (s, e) =>
-            {
-                this.Text = "*Edit Log " + Path.GetFileName(logFile);
-                Changed = true;
-            };
+            m_txtLog.TextChanged += M_txtLog_TextChanged;
         }
+
+        private void M_txtLog_TextChanged(object sender, EventArgs e)
+        {
+            if (Changed) return;
+            this.Text = "*Edit Log " + Path.GetFileName(LogFile);
+            Changed = true;
+        }
+
         protected override void OnShown(EventArgs e) => m_txtLog.ScrollToCaret();
         protected override void OnFormClosed(FormClosedEventArgs e) => this.Dispose();
         protected override void OnFormClosing(FormClosingEventArgs e)
@@ -67,14 +71,14 @@ namespace NetworkOnlineMonitor
 
             int prevSelectionStart = m_txtLog.SelectionStart;
             int prevSelectionLength = m_txtLog.SelectionLength;
-            bool prevChanged = Changed; 
+            m_txtLog.TextChanged -= M_txtLog_TextChanged; //Don't need to mark as 'changed' because this is also being written to the live log file.
 
             m_txtLog.SelectionStart = m_txtLog.MaxLength;
             m_txtLog.AppendText(s);
             if (s.Length < 1 || s[s.Length - 1] != '\n') m_txtLog.AppendText(Environment.NewLine);
 
             m_txtLog.Select(prevSelectionStart, prevSelectionLength);
-            Changed = prevChanged; //Don't need to mark as 'changed' because this is also being written to the live log file.
+            m_txtLog.TextChanged += M_txtLog_TextChanged;
         }
     }
 }
