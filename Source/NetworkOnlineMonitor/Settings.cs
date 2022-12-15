@@ -71,7 +71,7 @@ namespace NetworkOnlineMonitor
         public TargetIP[] Targets;
 
         /// <summary>
-        /// Popup the window when a fault (network down) lasts longer than 'LogMinLength'.
+        /// Popup the window when a fault (network down) lasts longer than 'OfflineTrigger'.
         /// </summary>
         [XmlElement(Order = 6)]
         public bool PopUpOnFailure { get; set; } = false;
