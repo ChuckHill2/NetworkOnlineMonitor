@@ -1,27 +1,34 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Windows.Forms;
 using ChuckHill2.Forms;
 
 namespace NetworkOnlineMonitor
 {
     /// <summary>
-    /// Perform Developer logging via a instance or static calls. May be used in a multi-threadded environment.
+    /// Perform Event logging. May be used in a multi-threaded environment.
     /// </summary>
-    /// <remarks>
-    /// This class has been named XFileLogging because the name 'FileLogging' is all too common!!
-    /// </remarks>
     [Serializable]
     public class FileLogging: MarshalByRefObject, IDisposable
     {
+        private readonly object StreamLock = new object();
+        private const int MaxLogSize = 1024 * 1024 * 100; //100MB
         private bool WroteSoftDivider = true; //flag to disallow multiple SoftDividers to be written consecutively.
-        private StreamWriter stream;
-        public readonly string OutputFile;
-        public readonly bool Append;
-        private int HeaderLength;
+        private StreamWriter stream = null;
+        private int HeaderLength = 0;
         private FormLogEditor EditDialog = null;
 
+        public readonly string OutputFile;
+        public readonly bool Append;
+
+        /// <summary>
+        /// Creates a free-form diary-like plain text log file.
+        /// </summary>
+        /// <param name="outputFile">name of log file to write to or null to create a dummy log that writes to the bit-bucket</param>
+        /// <param name="append">True to append to an existing file. False (the default) to open a new file overwriting any existing file.</param>
         public FileLogging(string outputFile=null, bool append=false)
         {
             OutputFile = outputFile;
@@ -31,7 +38,7 @@ namespace NetworkOnlineMonitor
 
             //If file is too big, rename the old one and start a new one.
             var fi = new FileInfo(outputFile);
-            if (fi.Exists && fi.Length > 1024*1024*100) // >100MB
+            if (fi.Exists && fi.Length > MaxLogSize)
             {
                 var dt = fi.CreationTime;
                 var fn = string.Concat(Path.GetDirectoryName(outputFile), "\\", Path.GetFileNameWithoutExtension(outputFile)," ", fi.CreationTime.ToString("yyyy-MM-dd HH.mm.ss"), Path.GetExtension(outputFile));
@@ -44,10 +51,10 @@ namespace NetworkOnlineMonitor
             if (append) fs = new FileStream(outputFile, FileMode.Append, FileAccess.Write, FileShare.ReadWrite, 4096, FileOptions.SequentialScan);
             else fs = new FileStream(outputFile, FileMode.Create, FileAccess.Write, FileShare.ReadWrite, 4096, FileOptions.SequentialScan);
             //LeaveOpen==false, We want StreamWriter to close our base stream as well.
-            stream = new StreamWriter(fs, System.Text.Encoding.UTF8, 1024, false);
+            stream = new StreamWriter(fs, System.Text.Encoding.UTF8, 1024, leaveOpen:false);
 
-            //Write the starting hard divider
-            var msg = $"= {Path.GetFileNameWithoutExtension(StaticTools.ExecutableName)} Log {DateTime.Now.ToString("g")} =";
+            //Write the starting hard divider with centered text
+            var msg = $"= {Path.GetFileNameWithoutExtension(StaticTools.ExecutableName)} Log {DateTime.Now.ToString("G")} =";
             int pad = 78 - msg.Length;
             if (pad < 0) pad = 0;
             int leftpad = pad / 2;
@@ -73,7 +80,7 @@ namespace NetworkOnlineMonitor
         public void Dispose()
         {
             if (stream == null) return;
-            lock (stream)
+            lock (StreamLock)
             {
                 //Remove disposing events
                 AppDomain.CurrentDomain.DomainUnload -= CurrentDomain_DisposeLog;
@@ -84,13 +91,13 @@ namespace NetworkOnlineMonitor
                 EditDialog?.Close();
                 EditDialog = null;
 
-                //Write the ending hard divider and close the log.
-                var msg = "==== End of Log ";
+                //Write the ending hard divider (with same length a header) and close the log.
+                var msg = $"==== End of Log {DateTime.Now.ToString("G")} =";
                 msg = msg + new string('=', HeaderLength - msg.Length);
                 stream.WriteLine(msg);
                 stream.Close();
+                stream = null;
             }
-            stream = null;
         }
 
         /// <summary>
@@ -116,24 +123,28 @@ namespace NetworkOnlineMonitor
         {
             if (msg == null) return;
             if (stream == null) return;
-            lock (stream)
+            lock (StreamLock)
             {
                 if (stream == null) return;
                 WroteSoftDivider = false;
                 if (EditDialog != null && !EditDialog.IsDisposed) EditDialog.AppendLine(msg);
                 stream.BaseStream.Seek(0, SeekOrigin.End); //Incase someone edited the file, externally (not FormLogEditor).
                 stream.WriteLine(msg);
-                //Always flush to disk so external editing is always current.
+                //Always flush to disk so external editing is always current. It is up to the external editor to update itself to any new changes.
                 stream.Flush();
                 stream.BaseStream.FlushAsync();
             }
         }
 
+        /// <summary>
+        /// Open log editor. It is kept in sync with live log.
+        /// </summary>
         public void LogEdit()
         {
+            if (string.IsNullOrEmpty(OutputFile)) return;
+
             if (EditDialog != null && !EditDialog.IsDisposed)
             {
-                //MiniMessageBox.ShowDialog(EditDialog.Owner, "Log Editor is already open.", "Log Edit", MessageBoxButtons.OK, MessageBoxIcon.Hand);
                 EditDialog.Focus();
                 return;
             }
@@ -144,5 +155,93 @@ namespace NetworkOnlineMonitor
             EditDialog = new FormLogEditor(OutputFile);
             EditDialog.Show(Application.OpenForms[Application.OpenForms.Count - 1]);
         }
-   }
+
+        /// <summary>
+        /// Generate an accurately protrayed fake log file to test:
+        /// (1) large file rename and new log.
+        /// (2) LogEditor performance.
+        /// </summary>
+        /// <param name="outputFile">Name of log to create</param>
+        public static void GenerateFakeLog(string outputFile)
+        {
+            Func<TimeSpan, string> TimeSpanFormat = tsp => $"{(int)tsp.TotalHours:#0}:{tsp.Minutes:00}:{tsp.Seconds:00}";
+            Func<int, string> TimeSpanFormatI = seconds => TimeSpanFormat(new TimeSpan(0, 0, 0, seconds));
+
+            if (string.IsNullOrEmpty(outputFile)) outputFile = "NetworkOnLineMonitor.txt";
+
+            var dt = DateTime.Now;
+            Random rand = new Random();
+
+            using (FileStream fs = new FileStream(outputFile, FileMode.Create, FileAccess.Write, FileShare.ReadWrite, 4096, FileOptions.SequentialScan))
+            using (var stream = new StreamWriter(fs))
+            {
+                var downtimeList = new List<int>(255);
+                var msg = string.Empty;
+                int fileLen = 0;
+                int recordCount = 0;
+                while (fileLen < MaxLogSize)
+                {
+                    var startDate = dt;
+
+                    msg = $@"
+================= NetworkOnlineMonitor Log {dt:yyyy-MM-dd HH:mm:ss} =================
+Ping Target 1: 8.8.8.8 - Google
+Ping Target 2: 4.2.2.2 - Level3
+Ping Target 3: 1.1.1.1 - Cloudflare
+Wait for Ping (milliseconds): 200
+Test Interval (seconds): 5
+Log Failure Longer Than (seconds): 10
+---------------------------------------";
+                    stream.WriteLine(msg);
+                    if ((fileLen += msg.Length) > MaxLogSize) break;
+                    recordCount++;
+
+                    int kount = rand.Next(1, 255);
+                    for (int i = 0; i < kount; i++)
+                    {
+                        int duration = rand.Next(0, 3600);
+                        dt = dt.AddMinutes(duration / 60.0 + rand.Next(1, 10));
+                        downtimeList.Add(duration);
+
+                        if (rand.Next(0, 100) == 0)
+                            msg = $"LAN Failed - {dt:yyyy-MM-dd HH:mm:ss}, Duration={TimeSpanFormatI(duration)}";
+                        else
+                            msg = $"WAN Failed - {dt:yyyy-MM-dd HH:mm:ss}, Duration={TimeSpanFormatI(duration)}, LAN responded in 1 ms";
+                        if ((fileLen += msg.Length) > MaxLogSize) break;
+                        stream.WriteLine(msg);
+                        recordCount++;
+
+                        if (rand.Next(0, 255) == 0)
+                        {
+                            dt = dt.AddMinutes(rand.Next(60, 3600) / 60.0);
+                            msg = $"{dt:yyyy-MM-dd HH:mm:ss},\"Something happened here\r\nSecond Line\r\nThird Line\"";
+                            fileLen += msg.Length;
+                            stream.WriteLine(msg);
+                            recordCount++;
+                        }
+                    }
+
+                    downtimeList.Sort();
+                    var median = downtimeList.Count % 2 == 0 ? (downtimeList[downtimeList.Count / 2] + downtimeList[downtimeList.Count / 2 - 1]) / 2 : downtimeList[downtimeList.Count / 2];
+
+                    msg = $@"---------------------------------------
+Log End {dt:G}
+Monitor Duration {TimeSpanFormat(dt-startDate)}
+Failure Summary:
+  Count          {kount}
+  Total Downtime {TimeSpanFormatI(downtimeList.Sum())}
+  % Downtime     {(downtimeList.Sum()/(dt - startDate).TotalSeconds).ToString("0.00%")}%
+  Minimum Length {TimeSpanFormatI(downtimeList.Min())}
+  Maximum Length {TimeSpanFormatI(downtimeList.Max())}
+  Average Length {TimeSpanFormatI((int)downtimeList.Average())}
+  Median Length  {TimeSpanFormatI(median)}
+==== End of Log ==============================================================";
+                    downtimeList.Clear();
+                    fileLen += msg.Length;
+                    stream.WriteLine(msg);
+                    recordCount++;
+                }
+            }
+        }
+    }
 }
