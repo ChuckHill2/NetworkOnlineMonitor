@@ -112,16 +112,6 @@ namespace NetworkOnlineMonitor.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Icon similar to (Icon).
         /// </summary>
-        internal static System.Drawing.Icon favicon_Green {
-            get {
-                object obj = ResourceManager.GetObject("favicon_Green", resourceCulture);
-                return ((System.Drawing.Icon)(obj));
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized resource of type System.Drawing.Icon similar to (Icon).
-        /// </summary>
         internal static System.Drawing.Icon favicon_Red {
             get {
                 object obj = ResourceManager.GetObject("favicon_Red", resourceCulture);

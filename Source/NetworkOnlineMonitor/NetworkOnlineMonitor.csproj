@@ -152,7 +152,6 @@
   <ItemGroup>
     <None Include="Resources\AboutInfo.htm" />
     <Content Include="Resources\Close16.png" />
-    <Content Include="Resources\favicon-Green.ico" />
     <Content Include="Resources\favicon-Red.ico" />
     <Content Include="Resources\favicon.ico" />
     <None Include="Resources\LanDisabled64.png" />
