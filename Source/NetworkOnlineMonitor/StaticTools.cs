@@ -139,30 +139,6 @@ namespace NetworkOnlineMonitor
         }
 
         /// <summary>
-        /// Force (parent) control to contain a child control where the parent is not a container control (e.g. Forms, Panels, GroupGoxes, etc).
-        /// This allows the child to not block the parent painting. Ideal of child has a Color.Transparent background.
-        /// The forms designer does not allow this so this must be performed after InitializeComponent();
-        /// Be careful as the child will be clipped if its boundries are outside the parent client area.
-        /// </summary>
-        /// <param name="parent"></param>
-        /// <param name="child"></param>
-        public static void BringToFrontOf(Control parent, Control child)
-        {
-            var backColor = child.BackColor; //maintain expected properties from the designer.
-            var foreColor = child.ForeColor;
-            var font = child.Font;
-            var rc = parent.RectangleToClient(child.Parent.RectangleToScreen(child.Bounds));
-
-            child.Parent.Controls.Remove(child);
-            parent.Controls.Add(child);
-
-            child.Location = rc.Location; //restore expected (designed) properties.
-            child.BackColor = backColor;
-            child.ForeColor = foreColor;
-            child.Font = font;
-        }
-
-        /// <summary>
         /// Enable/Disable this executable for autostart upon login.
         /// </summary>
         /// <param name="enable"></param>
@@ -211,56 +187,6 @@ namespace NetworkOnlineMonitor
             }
         }
         #endregion public static long UtcTimerTicks
-
-        #region public static long LocalTimerTicks
-        private struct SYSTEMTIME
-        {
-            public ushort wYear;
-            public ushort wMonth;
-            public ushort wDayOfWeek;
-            public ushort wDay;
-            public ushort wHour;
-            public ushort wMinute;
-            public ushort wSecond;
-            public ushort wMilliseconds;
-        }
-        [DllImport("Kernel32.dll")]
-        private static extern bool SystemTimeToTzSpecificLocalTime(IntPtr lpTimeZoneInformation, ref SYSTEMTIME utcTime, out SYSTEMTIME localTime);
-        [DllImport("Kernel32.dll")]
-        private static extern bool FileTimeToSystemTime(ref long ticks, out SYSTEMTIME localTime);
-        [DllImport("Kernel32.dll")]
-        private static extern bool SystemTimeToFileTime(ref SYSTEMTIME systime, out long lpFileTime);
-
-        /// <summary>
-        /// Local time in ticks. Takes a little more time to compute than UtcTimerTicks.
-        /// </summary>
-        public static long LocalTimerTicks
-        {
-            get
-            {
-                GetSystemTimeAsFileTime(out var utcTicks);
-                utcTicks += 0x0701ce1722770000; //offset from 1/1/1601 to 1/1/0001
-                FileTimeToSystemTime(ref utcTicks, out var utcSystemTime);
-                SystemTimeToTzSpecificLocalTime(IntPtr.Zero, ref utcSystemTime, out var localSystemTme);
-                SystemTimeToFileTime(ref localSystemTme, out long localTicks);
-                return localTicks;
-            }
-        }
-        #endregion public static long LocalTimerTicks
-
-        /// <summary>
-        /// Used to pause current action but still allow Windows message pump to continue.
-        /// </summary>
-        /// <param name="ms">Time in milliseconds to wait.</param>
-        /// <param name="cancel">Optional cancellation to return immediately.</param>
-        public static void ControlSleep(int ms, CancellationToken cancel = default(CancellationToken))
-        {
-            SpinWait.SpinUntil(() =>
-            {
-                Application.DoEvents();
-                return !cancel.IsCancellationRequested;
-            }, ms);
-        }
 
         #region public static void AllowOnlyOneInstance()
         private const int SW_RESTORE = 9;
