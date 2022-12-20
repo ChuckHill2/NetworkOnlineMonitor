@@ -50,6 +50,7 @@ namespace NetworkOnlineMonitor
             this.m_wbDocument.Name = "m_wbDocument";
             this.m_wbDocument.Size = new System.Drawing.Size(478, 450);
             this.m_wbDocument.TabIndex = 1;
+            this.m_wbDocument.Navigating += new System.Windows.Forms.WebBrowserNavigatingEventHandler(this.m_wbDocument_Navigating);
             // 
             // FormAbout
             // 

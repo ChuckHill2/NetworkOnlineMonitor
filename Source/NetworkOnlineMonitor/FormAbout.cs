@@ -1,14 +1,9 @@
 using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
-using System.Linq;
 using System.Reflection;
-using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace NetworkOnlineMonitor
@@ -40,10 +35,13 @@ namespace NetworkOnlineMonitor
             if (!AboutInfo.TryGetTarget(out string aboutInfo))
             {
                 Assembly asm = Assembly.GetEntryAssembly();
-                aboutInfo = Regex.Replace(global::NetworkOnlineMonitor.Properties.Resources.AboutInfo, @"\[VERSION\]|\[CONFIGURATION\]", m =>
+                var config = Attribute<AssemblyConfigurationAttribute>(asm);
+                config = config.Equals("DEBUG", StringComparison.CurrentCultureIgnoreCase) ? " (DEBUG)" : String.Empty;
+
+                aboutInfo = Regex.Replace(global::NetworkOnlineMonitor.Properties.Resources.AboutInfo, @"\[VERSION\]|\[BUILDDATE\]", m =>
                 {
-                    if (m.Value == "[VERSION]") return $"Version {asm.GetName().Version}   {ExecutableTimestamp(asm.Location):g}";
-                    if (m.Value == "[CONFIGURATION]") return $"Build Configuration: {Attribute<AssemblyConfigurationAttribute>(asm)}";
+                    if (m.Value == "[VERSION]") return $"Version {asm.GetName().Version}{config}";
+                    if (m.Value == "[BUILDDATE]") return $"Build Date {ExecutableTimestamp(asm.Location):g}";
                     return "Ack! Should not get here!";
                 });
 
@@ -51,6 +49,15 @@ namespace NetworkOnlineMonitor
             }
 
             m_wbDocument.DocumentText = aboutInfo;
+        }
+
+        //Goto link in a new browser window.
+        private void m_wbDocument_Navigating(object sender, WebBrowserNavigatingEventArgs e)
+        {
+            var url = e.Url.AbsoluteUri;
+            if (url.Equals("about:blank",StringComparison.CurrentCultureIgnoreCase)) return;
+            e.Cancel = true;
+            Process.Start(url);
         }
 
         private static string Attribute<T>(Assembly asm) where T : Attribute
