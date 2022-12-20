@@ -8,7 +8,7 @@ namespace NetworkOnlineMonitor
         [STAThread]
         static void Main()
         {
-            StaticTools.AllowOnlyOneInstance();
+            StaticTools.AllowOnlyOneInstance("Network Online Monitor"); //FormMain window title name
 
             AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
             Application.EnableVisualStyles();

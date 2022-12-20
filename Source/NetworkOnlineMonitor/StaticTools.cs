@@ -191,7 +191,9 @@ namespace NetworkOnlineMonitor
         public static bool AutostartExists()
         {
             var name = Path.GetFileNameWithoutExtension(ExecutableName);
-            return Registry.GetValue(@"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Run", name, null) != null;
+            string oldvalue = Registry.GetValue(@"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Run", name, null) as string;
+            //The exe may have been moved so we not only test for null(existance) but also test for path equality.
+            return ExecutableName == oldvalue;
         }
 
         #region public static long UtcTimerTicks
@@ -262,16 +264,16 @@ namespace NetworkOnlineMonitor
 
         #region public static void AllowOnlyOneInstance()
         private const int SW_RESTORE = 9;
-        [DllImport("User32.dll")] private static extern bool SetForegroundWindow(IntPtr handle);
         [DllImport("User32.dll")] private static extern bool ShowWindow(IntPtr handle, int nCmdShow);
-        [DllImport("User32.dll")] private static extern bool IsIconic(IntPtr handle);
+        [DllImport("User32.dll")] private static extern bool SetForegroundWindow(IntPtr handle);
 
         /// <summary>
         /// Allow only one instance of this executable to run.
         /// The other instance window is popped open to the foreground and this instance terminates.
         /// This should be the first line of Program.cs:Program.Main().
         /// </summary>
-        public static void AllowOnlyOneInstance()
+        /// <param name="caption">Window caption to search by if window not visible (e.g. not in the taskbar). This may occur when using the NotifyIcon control.</param>
+        public static void AllowOnlyOneInstance(string caption)
         {
             var currentProcess = Process.GetCurrentProcess();
             var processes = Process.GetProcessesByName(currentProcess.ProcessName);
@@ -281,11 +283,57 @@ namespace NetworkOnlineMonitor
             if (otherProcess == null) return; //should never occur.
 
             IntPtr handle = otherProcess.MainWindowHandle;
+            //handle==zero occurs if not a Winforms process or if form is not visible such as used
+            //within a NotifyIcon control. So we have to try harder searching by windows caption.
+            if (handle == IntPtr.Zero) handle = FindWindow(otherProcess.Id, caption);
             if (handle == IntPtr.Zero) return; //should never occur.
-            if (IsIconic(handle)) ShowWindow(handle, SW_RESTORE);
+            ShowWindow(handle, SW_RESTORE);
             SetForegroundWindow(handle);
 
             Environment.Exit(1);
+        }
+
+        private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+        [DllImport("user32.dll")] private static extern bool EnumWindows(EnumWindowsProc enumProc, IntPtr lParam);
+        [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out int processId);
+        [DllImport("user32.dll")] private static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
+        private static string GetWindowText(IntPtr hWnd)
+        {
+            var sb = new StringBuilder(512);
+            int result = GetWindowText(hWnd, sb, 512);
+            return sb.ToString();
+        }
+
+        private static IntPtr FindWindow(int pid, string caption)
+        {
+            IntPtr found = IntPtr.Zero;
+            if (string.IsNullOrWhiteSpace(caption)) caption = null;
+
+            EnumWindows(delegate (IntPtr hWnd, IntPtr param)
+            {
+                GetWindowThreadProcessId(hWnd, out int processId);
+                //Limit search to win32 windows within this process. If more than one form in this process has the same caption/title, then we just pick the first one....
+                if (processId==pid)
+                {
+                    if (caption != null)
+                    {
+                        if (caption.Equals(GetWindowText(hWnd).Trim(), StringComparison.CurrentCultureIgnoreCase))
+                        {
+                            found = hWnd;
+                            return false;
+                        }
+                    }
+                    else
+                    {
+                        found = hWnd;
+                        return false;
+                    }
+                }
+
+                return true; // Return true here so that we iterate all windows
+            }, IntPtr.Zero);
+
+            return found;
         }
         #endregion public static void AllowOnlyOneInstance()
 
