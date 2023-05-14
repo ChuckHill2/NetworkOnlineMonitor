@@ -104,10 +104,9 @@ namespace NetworkOnlineMonitor
             if (mediafile == null) throw new ArgumentNullException(nameof(mediafile));
             if (mciSendString($"open \"{mediafile}\" type mpegvideo alias MediaAlias2"))
             {
-                var sb = new StringBuilder(128);
                 var response = mciSendStringResponse($"status MediaAlias2 length");
                 mciSendString($"close MediaAlias2");
-                return int.TryParse(sb.ToString(), out var i) ? i : 0;
+                return int.TryParse(response, out var i) ? i : 0;
             }
             return 0;
         }
