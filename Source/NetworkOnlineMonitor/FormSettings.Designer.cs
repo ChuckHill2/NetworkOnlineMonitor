@@ -33,6 +33,7 @@ namespace NetworkOnlineMonitor
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(FormSettings));
             NetworkOnlineMonitor.SoundClip soundClip1 = new NetworkOnlineMonitor.SoundClip();
             this.m_pnlTest = new System.Windows.Forms.Panel();
+            this.m_grpEmpty = new System.Windows.Forms.GroupBox();
             this.m_txtGatewayIPAddress = new System.Windows.Forms.Label();
             this.m_txtLanIPAddress = new System.Windows.Forms.Label();
             this.m_txtComputerName = new System.Windows.Forms.Label();
@@ -73,7 +74,6 @@ namespace NetworkOnlineMonitor
             this.m_chkPopup = new System.Windows.Forms.CheckBox();
             this.m_lblAlertLogSettiings = new System.Windows.Forms.Label();
             this.m_ToolTips = new System.Windows.Forms.ToolTip(this.components);
-            this.m_grpEmpty = new System.Windows.Forms.GroupBox();
             this.m_pnlTest.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.m_numTestInterval)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.m_numPingResp)).BeginInit();
@@ -112,6 +112,14 @@ namespace NetworkOnlineMonitor
             this.m_pnlTest.Name = "m_pnlTest";
             this.m_pnlTest.Size = new System.Drawing.Size(374, 362);
             this.m_pnlTest.TabIndex = 1;
+            // 
+            // m_grpEmpty
+            // 
+            this.m_grpEmpty.Location = new System.Drawing.Point(14, 310);
+            this.m_grpEmpty.Name = "m_grpEmpty";
+            this.m_grpEmpty.Size = new System.Drawing.Size(346, 38);
+            this.m_grpEmpty.TabIndex = 22;
+            this.m_grpEmpty.TabStop = false;
             // 
             // m_txtGatewayIPAddress
             // 
@@ -396,6 +404,8 @@ namespace NetworkOnlineMonitor
             // 
             // m_pnlAlertLog
             // 
+            this.m_pnlAlertLog.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
             this.m_pnlAlertLog.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.m_pnlAlertLog.Controls.Add(this.m_numLogFailure);
             this.m_pnlAlertLog.Controls.Add(this.m_grpReconnectSound);
@@ -407,7 +417,7 @@ namespace NetworkOnlineMonitor
             this.m_pnlAlertLog.Controls.Add(this.m_lblAlertLogSettiings);
             this.m_pnlAlertLog.Location = new System.Drawing.Point(404, 14);
             this.m_pnlAlertLog.Name = "m_pnlAlertLog";
-            this.m_pnlAlertLog.Size = new System.Drawing.Size(422, 447);
+            this.m_pnlAlertLog.Size = new System.Drawing.Size(416, 447);
             this.m_pnlAlertLog.TabIndex = 2;
             // 
             // m_numLogFailure
@@ -444,7 +454,7 @@ namespace NetworkOnlineMonitor
             this.m_grpReconnectSound.Controls.Add(this.m_soundclipReconnect);
             this.m_grpReconnectSound.Location = new System.Drawing.Point(13, 308);
             this.m_grpReconnectSound.Name = "m_grpReconnectSound";
-            this.m_grpReconnectSound.Size = new System.Drawing.Size(395, 125);
+            this.m_grpReconnectSound.Size = new System.Drawing.Size(389, 125);
             this.m_grpReconnectSound.TabIndex = 12;
             this.m_grpReconnectSound.TabStop = false;
             this.m_grpReconnectSound.Text = "Reconnect Sound";
@@ -456,7 +466,7 @@ namespace NetworkOnlineMonitor
             this.m_soundclipReconnect.BackColor = System.Drawing.Color.Transparent;
             this.m_soundclipReconnect.Location = new System.Drawing.Point(14, 21);
             this.m_soundclipReconnect.Name = "m_soundclipReconnect";
-            this.m_soundclipReconnect.Size = new System.Drawing.Size(363, 89);
+            this.m_soundclipReconnect.Size = new System.Drawing.Size(357, 89);
             soundClip1.FileName = "[None]";
             this.m_soundclipReconnect.SoundClip = soundClip1;
             this.m_soundclipReconnect.TabIndex = 0;
@@ -468,7 +478,7 @@ namespace NetworkOnlineMonitor
             this.m_grpFailureAlertSound.Controls.Add(this.m_soundclipAlert);
             this.m_grpFailureAlertSound.Location = new System.Drawing.Point(13, 175);
             this.m_grpFailureAlertSound.Name = "m_grpFailureAlertSound";
-            this.m_grpFailureAlertSound.Size = new System.Drawing.Size(395, 125);
+            this.m_grpFailureAlertSound.Size = new System.Drawing.Size(389, 125);
             this.m_grpFailureAlertSound.TabIndex = 10;
             this.m_grpFailureAlertSound.TabStop = false;
             this.m_grpFailureAlertSound.Text = "Failure Alert Sound";
@@ -480,7 +490,7 @@ namespace NetworkOnlineMonitor
             this.m_soundclipAlert.BackColor = System.Drawing.Color.Transparent;
             this.m_soundclipAlert.Location = new System.Drawing.Point(14, 21);
             this.m_soundclipAlert.Name = "m_soundclipAlert";
-            this.m_soundclipAlert.Size = new System.Drawing.Size(363, 89);
+            this.m_soundclipAlert.Size = new System.Drawing.Size(357, 89);
             this.m_soundclipAlert.SoundClip = soundClip1;
             this.m_soundclipAlert.TabIndex = 0;
             // 
@@ -495,7 +505,7 @@ namespace NetworkOnlineMonitor
             this.m_grpLogFileOption.Controls.Add(this.m_radNewLogFile);
             this.m_grpLogFileOption.Location = new System.Drawing.Point(13, 81);
             this.m_grpLogFileOption.Name = "m_grpLogFileOption";
-            this.m_grpLogFileOption.Size = new System.Drawing.Size(395, 85);
+            this.m_grpLogFileOption.Size = new System.Drawing.Size(389, 85);
             this.m_grpLogFileOption.TabIndex = 9;
             this.m_grpLogFileOption.TabStop = false;
             this.m_grpLogFileOption.Text = "Log File Option";
@@ -507,7 +517,7 @@ namespace NetworkOnlineMonitor
             this.m_txtLogFileLocation.Location = new System.Drawing.Point(15, 53);
             this.m_txtLogFileLocation.Margin = new System.Windows.Forms.Padding(0);
             this.m_txtLogFileLocation.Name = "m_txtLogFileLocation";
-            this.m_txtLogFileLocation.Size = new System.Drawing.Size(342, 20);
+            this.m_txtLogFileLocation.Size = new System.Drawing.Size(336, 20);
             this.m_txtLogFileLocation.TabIndex = 13;
             this.m_txtLogFileLocation.TextLabel = "Log File Location";
             // 
@@ -516,7 +526,7 @@ namespace NetworkOnlineMonitor
             this.m_btnLogFileLocation.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
             this.m_btnLogFileLocation.FlatStyle = System.Windows.Forms.FlatStyle.Popup;
             this.m_btnLogFileLocation.Image = global::NetworkOnlineMonitor.Properties.Resources.SelectFolderBlue15;
-            this.m_btnLogFileLocation.Location = new System.Drawing.Point(355, 53);
+            this.m_btnLogFileLocation.Location = new System.Drawing.Point(349, 53);
             this.m_btnLogFileLocation.Margin = new System.Windows.Forms.Padding(0);
             this.m_btnLogFileLocation.Name = "m_btnLogFileLocation";
             this.m_btnLogFileLocation.Size = new System.Drawing.Size(20, 20);
@@ -610,26 +620,19 @@ namespace NetworkOnlineMonitor
             this.m_lblAlertLogSettiings.TabIndex = 1;
             this.m_lblAlertLogSettiings.Text = "Alert && Log Settings…";
             // 
-            // m_grpEmpty
-            // 
-            this.m_grpEmpty.Location = new System.Drawing.Point(14, 310);
-            this.m_grpEmpty.Name = "m_grpEmpty";
-            this.m_grpEmpty.Size = new System.Drawing.Size(346, 38);
-            this.m_grpEmpty.TabIndex = 22;
-            this.m_grpEmpty.TabStop = false;
-            // 
             // FormSettings
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(840, 475);
+            this.ClientSize = new System.Drawing.Size(834, 475);
             this.Controls.Add(this.m_pnlAlertLog);
             this.Controls.Add(this.m_pnlTest);
             this.Controls.Add(this.m_pnlStartup);
             this.Icon = global::NetworkOnlineMonitor.Properties.Resources.favicon;
             this.MaximizeBox = false;
+            this.MaximumSize = new System.Drawing.Size(1920, 514);
             this.MinimizeBox = false;
-            this.MinimumSize = new System.Drawing.Size(856, 468);
+            this.MinimumSize = new System.Drawing.Size(850, 514);
             this.Name = "FormSettings";
             this.ShowInTaskbar = false;
             this.SizeGripStyle = System.Windows.Forms.SizeGripStyle.Show;
