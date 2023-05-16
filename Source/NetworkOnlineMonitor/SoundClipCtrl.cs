@@ -15,6 +15,8 @@ namespace NetworkOnlineMonitor
 {
     public partial class SoundClipCtrl : UserControl
     {
+        private SoundClip PrevSoundClip = SoundClip.None;
+
         public SoundClipCtrl()
         {
             InitializeComponent();
@@ -56,12 +58,12 @@ namespace NetworkOnlineMonitor
             {
                 int selectedIndex = m_cmbSoundClip.SelectedIndex;
                 if (selectedIndex == -1 || selectedIndex == 0) return SoundClip.None;
-                if (selectedIndex == 1)  //User-supplied
+                if (selectedIndex == 1)  //User-supplied aka "Custom"
                 {
                     var f = m_txtSoundClipFile.Text.Trim();
-                    if (f.Length == 0 || !File.Exists(f)) return SoundClip.None;
+                    if (f.Length == 0 || !File.Exists(f)) return PrevSoundClip;
                     int dur = Sound.MediaDuration(f);
-                    if (dur == 0) return SoundClip.None;
+                    if (dur == 0) return PrevSoundClip; //Not an audio file
                     return new SoundClip(f, dur, (int)m_csVolume.Value);
                 }
                 else
@@ -78,8 +80,9 @@ namespace NetworkOnlineMonitor
                     return;
                 }
 
+                PrevSoundClip = value; //save as default upon invalid value upon Get
                 var i = m_cmbSoundClip.Items.IndexOf(value);
-                if (i==-1)
+                if (i==-1) //must be "Custom"
                 {
                     m_cmbSoundClip.SelectedIndex = 1;
                     m_txtSoundClipFile.Text = value.FileName;
